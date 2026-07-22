@@ -13,6 +13,7 @@ FluffBoard — минимальное full-stack приложение: React 19 
 | Файл | Компонент | Описание |
 |------|-----------|----------|
 | [[backend/API]] | API | ASP.NET Core minimal API, CORS и endpoint приветствия |
+| [[backend/GitHubClient]] | GitHub client | Получает открытые issues, labels и assignees из GitHub REST API |
 
 ### frontend
 
