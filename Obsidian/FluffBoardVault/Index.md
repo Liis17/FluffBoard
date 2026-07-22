@@ -1,6 +1,6 @@
 # FluffBoard — База знаний
 
-FluffBoard — минимальное full-stack приложение: React 19 + Vite на клиенте и ASP.NET Core на .NET 10 на сервере. Клиент показывает ответ backend API.
+FluffBoard — Kanban-доска одной GitHub-репозитории: React 19 + Vite на клиенте и ASP.NET Core на .NET 10 на сервере. Задачи живут в GitHub, пользователи доски — в локальной SQLite.
 
 ## Навигация
 
@@ -12,14 +12,16 @@ FluffBoard — минимальное full-stack приложение: React 19 
 
 | Файл | Компонент | Описание |
 |------|-----------|----------|
-| [[backend/API]] | API | ASP.NET Core minimal API, CORS и endpoint приветствия |
-| [[backend/GitHubClient]] | GitHub client | Получает открытые issues, labels и assignees из GitHub REST API |
+| [[backend/API]] | API | Вход, SQLite-пользователи и защищённое API Kanban-доски |
+| [[backend/GitHubClient]] | GitHub client | Получает и изменяет GitHub issues, labels и assignees |
+| [[backend/BoardDatabase]] | Локальная база | SQLite-пользователи доски и хеширование паролей |
+| [[backend/Конфигурация]] | Конфигурация | `.env`, одна репозитория и связанные идентичности пользователей |
 
 ### frontend
 
 | Файл | Компонент | Описание |
 |------|-----------|----------|
-| [[frontend/Приложение]] | Приложение | React-интерфейс, который запрашивает и показывает ответ API |
+| [[frontend/Приложение]] | Приложение | React-экран входа и Kanban-доска с редактором задач |
 
 ## Правила обновления базы знаний
 

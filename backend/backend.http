@@ -1,11 +1,34 @@
 @backend_HostAddress = http://localhost:5279
 
-GET {{backend_HostAddress}}/weatherforecast/
+GET {{backend_HostAddress}}/api/hello
 Accept: application/json
 
 ###
 
-GET {{backend_HostAddress}}/api/github/repos/octocat/Hello-World/issues
+# Log in first and let your HTTP client retain the session cookie.
+POST {{backend_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "replace-with-a-long-password"
+}
+
+###
+
+GET {{backend_HostAddress}}/api/board/issues
 Accept: application/json
+
+###
+
+POST {{backend_HostAddress}}/api/board/issues
+Content-Type: application/json
+
+{
+  "title": "A task created from FluffBoard",
+  "body": "This issue is synchronized with GitHub.",
+  "labels": ["todo"],
+  "assignee": "octocat"
+}
 
 ###

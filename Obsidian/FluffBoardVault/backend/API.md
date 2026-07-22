@@ -4,36 +4,37 @@ Parent: [[Index]]
 
 ## Назначение
 
-ASP.NET Core backend FluffBoard. Настраивает CORS для локального Vite-клиента, возвращает приветственное сообщение и получает issues GitHub-репозитория.
+ASP.NET Core backend FluffBoard: аутентифицирует пользователей локальной доски, работает с одной настроенной GitHub-репозиторией и синхронно создаёт, редактирует и читает её issues.
 
 ## Файлы
 
-- `backend/Program.cs` — создаёт приложение, регистрирует CORS, объявляет маршрут и запускает сервер.
-- `backend/GitHubClient.cs` — HTTP-клиент GitHub REST API и DTO для issues, labels и assignees.
-- `backend/backend.csproj` — web SDK, target framework `net10.0`, nullable и implicit usings.
-- `backend/Properties/launchSettings.json` — development-профиль HTTP на порту `5279`.
-- `backend/appsettings.json` — базовые уровни логирования и allowed hosts.
-- `backend/appsettings.Development.json` — development-переопределение логирования.
-- `backend/backend.http` — HTTP-запросы для ручной проверки API.
+- `backend/Program.cs` — конфигурация приложения, cookie authentication, CORS и minimal API.
+- `backend/GitHubClient.cs` — typed GitHub REST client; читает issues и labels, создаёт и обновляет issues.
+- `backend/BoardDatabase.cs` — SQLite-хранилище пользователей и PBKDF2-хеширование пароля.
+- `backend/BoardOptions.cs` — настройки репозитория и пользователей из конфигурации.
+- `backend/DotEnv.cs` — загружает отсутствующие переменные окружения из корневого `.env`.
+- `backend/backend.csproj` — web SDK и `Microsoft.Data.Sqlite`.
+- `backend/backend.http` — примеры входа и запросов доски.
 
-## Ключевые методы/функции
+## Маршруты
 
-| Метод | Описание |
-|-------|----------|
-| `AddCors(options)` | Регистрирует default policy для `http://localhost:5173` с любыми заголовками и HTTP-методами. |
-| `UseCors()` | Применяет default CORS policy к запросам приложения. |
-| `MapGet("/api/hello", handler)` | Возвращает `200 OK` с JSON-объектом `{ message }`. |
-| `MapGet("/api/github/repos/{owner}/{repository}/issues", handler)` | Возвращает все issues репозитория без pull request'ов вместе с labels и assignees. |
-| `GitHubClient.GetIssuesAsync(...)` | Запрашивает все страницы GitHub REST API, исключает ответы с `pull_request` и преобразует их в DTO приложения. |
-| `Run()` | Запускает HTTP-приложение. |
-
-## Зависимости
-
-- Использует: ASP.NET Core, `HttpClient`, GitHub REST API и конфигурацию из `appsettings*.json`.
-- Используется в: [[frontend/Приложение]].
+| Маршрут | Доступ | Назначение |
+|---|---|---|
+| `GET /api/hello` | публичный | Legacy-приветствие starter-приложения. |
+| `POST /api/auth/login` | публичный | Проверяет учётные данные и выдаёт cookie-сессию. |
+| `POST /api/auth/logout` | публичный | Удаляет текущую cookie-сессию. |
+| `GET /api/board/me` | пользователь доски | Возвращает текущий профиль. |
+| `GET /api/board/users` | пользователь доски | Возвращает участников и их GitHub login для назначения задачи. |
+| `GET /api/board/issues` | пользователь доски | Возвращает актуальные issues настроенной репозитории без pull request'ов. |
+| `GET /api/board/labels` | пользователь доски | Возвращает labels GitHub-репозитория. |
+| `POST /api/board/issues` | пользователь доски | Создаёт GitHub issue. |
+| `PUT /api/board/issues/{number}` | пользователь доски | Обновляет заголовок, описание, labels, исполнителя и state GitHub issue. |
 
 ## Важные детали
 
-Endpoint и CORS origin привязаны к локальным адресам из `launchSettings.json` и Vite-конфигурации. При изменении порта frontend или backend нужно обновить эти значения и URL запроса в клиенте.
-
-Для private-репозиториев и более высокого лимита GitHub задай токен только через переменную окружения `GitHub__Token`; в `appsettings*.json` секрет не хранится. Без токена доступны public-репозитории в анонимном лимите GitHub.
+- Настройки берутся из `.env`: `GitHub__Token`, `Board__Repository__Owner`, `Board__Repository__Name` и массив `Board__Users__N__*`. Реальный `.env` не коммитится; пример — [`.env.example`](../../../.env.example).
+- SQLite по умолчанию хранится в `data/fluffboard.db`. При старте учётные записи точно синхронизируются с конфигурацией: добавляются, обновляются и удаляются, если пользователя больше нет в `.env`; пароль сохраняется только как PBKDF2-хеш.
+- Все пользователи доски могут управлять задачами. `GitHubLogin` и `TelegramId` относятся к одному локальному пользователю; Telegram ID пока служит только связью идентичностей.
+- Редактор предлагает назначать связанные `GitHubLogin`, но сохраняет уже назначенный внешний GitHub-аккаунт, чтобы реальные задачи можно было безопасно править до его привязки к доске.
+- GitHub token никогда не передаётся клиенту. Он должен принадлежать отдельному сервисному аккаунту и иметь **Issues: Read and write** в настроенной репозитории.
+- Для `todo`, `in-progress` и `done` используются labels GitHub. Если статус нужен при создании/редактировании, отсутствующий workflow-label создаётся в репозитории. Закрытие issue остаётся отдельным состоянием GitHub, а не побочным эффектом Kanban-колонки.

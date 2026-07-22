@@ -4,19 +4,19 @@ Parent: [[Index]]
 
 ## Назначение
 
-`GitHubClient` получает все issues выбранного GitHub-репозитория и возвращает для каждой номер, заголовок, URL, labels и assignees.
-
-## Файл
-
-- `backend/GitHubClient.cs` — typed `HttpClient` для GitHub REST API, DTO ответа и преобразование данных GitHub в DTO FluffBoard.
+`GitHubClient` — единственная граница backend с GitHub REST API. Он получает актуальные issues и labels, создаёт и обновляет issues от имени сервисного аккаунта.
 
 ## Ключевые методы
 
 | Метод | Описание |
-|-------|----------|
-| `GetIssuesAsync(owner, repository, cancellationToken)` | Запрашивает все страницы списка issues, исключает pull request'ы и возвращает данные, нужные интерфейсу. |
-| `Configure(httpClient, token)` | Настраивает GitHub base URL, заголовки API и необязательную Bearer-авторизацию. |
+|---|---|
+| `GetIssuesAsync(...)` | Загружает все страницы issues, исключает pull request'ы и возвращает номер, заголовок, body, state, URL, labels и assignees. |
+| `GetLabelsAsync(...)` | Загружает все labels репозитория для редактора задачи. |
+| `CreateIssueAsync(...)` | Создаёт задачу с описанием, labels и исполнителем. |
+| `UpdateIssueAsync(...)` | Обновляет поля и state существующей задачи. |
+| `EnsureWorkflowLabelsAsync(...)` | Создаёт отсутствующие labels `todo`, `in-progress`, `done` перед записью задачи. |
+| `Configure(...)` | Настраивает base URL, обязательные GitHub-заголовки и Bearer token. |
 
 ## Важные детали
 
-GitHub API включает pull request'ы в issues-ответ; записи с полем `pull_request` исключаются. `GitHub__Token` не хранится в файлах проекта и используется только backend для private-репозиториев или увеличения лимита запросов.
+GitHub включает pull request'ы в issues-ответ; записи с полем `pull_request` исключаются. Пагинация не зависит от конкретного параметра: клиент переходит по URL из `Link: rel="next"`, поэтому работает и с page-, и с cursor-based выдачей GitHub. Токен берётся только из `GitHub__Token` на backend.
