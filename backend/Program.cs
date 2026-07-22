@@ -3,12 +3,25 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
-DotEnv.LoadMissingEnvironmentVariables(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
+var processArguments = Environment.GetCommandLineArgs();
+var macMode = args.Any(argument => string.Equals(argument.Trim(), "--mac", StringComparison.OrdinalIgnoreCase)) ||
+              processArguments.Any(argument => string.Equals(argument.Trim(), "--mac", StringComparison.OrdinalIgnoreCase));
+Console.WriteLine($"[startup] application args: {string.Join(' ', args)}");
+Console.WriteLine($"[startup] process args: {string.Join(' ', processArguments)}");
+Console.WriteLine($"[startup] mac mode: {macMode}");
+var applicationArgs = args
+    .Where(argument => !string.Equals(argument.Trim(), "--mac", StringComparison.OrdinalIgnoreCase))
+    .ToArray();
+var environmentFile = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"));
 
-var builder = WebApplication.CreateBuilder(args);
+DotEnv.LoadEnvironmentVariables(environmentFile, overwriteExisting: macMode);
+
+var builder = WebApplication.CreateBuilder(applicationArgs);
 builder.Configuration.AddEnvironmentVariables();
 
 var boardOptions = builder.Configuration.GetSection("Board").Get<BoardOptions>() ?? new BoardOptions();
+Console.WriteLine($"[startup] Board:Repository:Owner={boardOptions.Repository.Owner}");
+Console.WriteLine($"[startup] Board:Repository:Name={boardOptions.Repository.Name}");
 ValidateBoardOptions(boardOptions);
 
 builder.Services.AddSingleton(boardOptions);

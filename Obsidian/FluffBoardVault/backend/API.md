@@ -12,7 +12,7 @@ ASP.NET Core backend FluffBoard: аутентифицирует пользова
 - `backend/GitHubClient.cs` — typed GitHub REST client; читает issues и labels, создаёт и обновляет issues.
 - `backend/BoardDatabase.cs` — SQLite-хранилище пользователей и PBKDF2-хеширование пароля.
 - `backend/BoardOptions.cs` — настройки репозитория и пользователей из конфигурации.
-- `backend/DotEnv.cs` — загружает отсутствующие переменные окружения из корневого `.env`.
+- `backend/DotEnv.cs` — загружает переменные окружения из корневого `.env`; в режиме `--mac` его значения имеют приоритет над окружением процесса.
 - `backend/backend.csproj` — web SDK и `Microsoft.Data.Sqlite`.
 - `backend/backend.http` — примеры входа и запросов доски.
 
@@ -32,7 +32,7 @@ ASP.NET Core backend FluffBoard: аутентифицирует пользова
 
 ## Важные детали
 
-- Настройки берутся из `.env`: `GitHub__Token`, `Board__Repository__Owner`, `Board__Repository__Name` и массив `Board__Users__N__*`. Реальный `.env` не коммитится; пример — [`.env.example`](../../../.env.example).
+- Настройки берутся из `.env`: `GitHub__Token`, `Board__Repository__Owner`, `Board__Repository__Name` и массив `Board__Users__N__*`. При обычном запуске корневой `.env` лишь дополняет окружение процесса. Команда `dotnet run --project backend -- --mac` отдаёт приоритет корневому `.env`, а отсутствующие в нём значения берёт из окружения процесса. Реальный `.env` не коммитится; пример — [`.env.example`](../../../.env.example).
 - SQLite по умолчанию хранится в `data/fluffboard.db`. При старте учётные записи точно синхронизируются с конфигурацией: добавляются, обновляются и удаляются, если пользователя больше нет в `.env`; пароль сохраняется только как PBKDF2-хеш.
 - Все пользователи доски могут управлять задачами. `GitHubLogin` и `TelegramId` относятся к одному локальному пользователю; Telegram ID пока служит только связью идентичностей.
 - Редактор предлагает назначать связанные `GitHubLogin`, но сохраняет уже назначенный внешний GitHub-аккаунт, чтобы реальные задачи можно было безопасно править до его привязки к доске.

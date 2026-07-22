@@ -20,3 +20,13 @@ npm run dev --prefix frontend
 ```
 
 Открой адрес Vite, обычно `http://localhost:5173`. В development-режиме Vite проксирует `/api` на `http://localhost:5279`.
+
+### Запуск на macOS
+
+Помести `.env` в корень FluffBoard и запусти backend так:
+
+```bash
+dotnet run --project backend -- --mac
+```
+
+Значения из корневого `.env` имеют приоритет. Для отсутствующих в нём настроек backend использует переменные окружения процесса, например переданные контейнером.
