@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { getAvatarColor, getLabelColors, getPlatform, getPriority } from '../board.js'
 
 export function PriorityPill({ priority, bare = false }) {
@@ -33,7 +34,12 @@ export function PlatformChip({ id }) {
   )
 }
 
+// Аватар берётся по логину: `github.com/<login>.png` редиректит на CDN, поэтому подходит
+// и там, где на руках только логин (выбор исполнителя, оптимистичный перенос). Пока картинка
+// не загрузилась или её нет — под ней остаётся буква логина на цветном круге.
 export function Avatar({ login, size = 24 }) {
+  const [broken, setBroken] = useState(false)
+
   return (
     <span
       className="avatar"
@@ -41,6 +47,14 @@ export function Avatar({ login, size = 24 }) {
       title={login}
     >
       {login.slice(0, 1).toUpperCase()}
+      {!broken && (
+        <img
+          src={`https://github.com/${login}.png?size=${size * 2}`}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      )}
     </span>
   )
 }
