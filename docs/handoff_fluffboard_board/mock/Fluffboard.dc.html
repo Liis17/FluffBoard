@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0}
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:rgba(120,140,170,.28);border-radius:20px}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes fbpop{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+  @keyframes fbfade{from{opacity:0}to{opacity:1}}
+  textarea{font-family:'Manrope',system-ui,sans-serif}
+</style>
+</helmet>
+<div style="{{ rootStyle }}">
+  <div style="max-width:1500px;margin:0 auto;padding:26px 30px 60px">
+
+    <!-- Header -->
+    <header style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:44px;height:44px;border-radius:13px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font:800 20px var(--font);flex:none;box-shadow:var(--shadow)">F</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <h1 style="margin:0;font:800 26px/1 var(--font);color:var(--text);letter-spacing:-.02em">Доска задач</h1>
+            <span style="font:700 10px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:var(--muted);background:var(--chip);border:1px solid var(--border);padding:4px 8px;border-radius:6px">GITHUB ISSUES</span>
+          </div>
+          <p style="margin:0;font:400 13px/1.4 var(--font);color:var(--muted)">Все изменения задач сразу записываются в GitHub</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onClick="{{ openNew }}" style="border:none;background:var(--accent);color:var(--accent-ink);font:700 14px var(--font);padding:10px 18px;border-radius:var(--rad);cursor:pointer" style-hover="filter:brightness(1.12)">+ Новая задача</button>
+        <div style="display:flex;align-items:center;gap:10px;padding-left:12px;border-left:1px solid var(--border)">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#2563eb;color:#fff;font:700 13px var(--font);flex:none">L</span>
+          <span style="font:600 14px var(--font);color:var(--text)">liis17</span>
+          <button style="border:1px solid var(--border);background:var(--card-bg);color:var(--muted);font:600 13px var(--font);padding:7px 13px;border-radius:var(--rad);cursor:pointer" style-hover="color:var(--text)">Выйти</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Global stat badges -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-top:22px">
+      <sc-for list="{{ statBadges }}" as="b" hint-placeholder-count="5">
+        <div style="{{ b.card }}">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font:600 12px var(--font);color:var(--muted)">{{ b.label }}</span>
+            <span style="{{ b.dot }}"></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:9px">
+            <span style="font:800 28px/1 var(--font);color:var(--text);letter-spacing:-.02em">{{ b.value }}</span>
+            <span style="font:600 12px var(--font);color:{{ b.subColor }}">{{ b.sub }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-top:22px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:9px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--rad);padding:8px 13px;min-width:230px;flex:1;max-width:360px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input value="{{ query }}" onInput="{{ onSearch }}" placeholder="Поиск задач…" style="border:none;outline:none;background:transparent;color:var(--text);font:500 14px var(--font);width:100%"/>
+      </div>
+
+      <div style="display:flex;background:var(--chip);border:1px solid var(--border);border-radius:var(--rad);padding:3px;gap:2px">
+        <button onClick="{{ setBoard }}" style="{{ tabBoard }}">Доска</button>
+        <button onClick="{{ setList }}" style="{{ tabList }}">Список</button>
+        <button onClick="{{ setTable }}" style="{{ tabTable }}">Таблица</button>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:7px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--rad);padding:7px 11px;color:var(--muted);font:500 13px var(--font)">
+        Группировка
+        <select value="{{ groupBy }}" onChange="{{ onGroup }}" style="border:none;background:transparent;color:var(--text);font:600 13px var(--font);outline:none;cursor:pointer">
+          <option value="status">Статус</option>
+          <option value="assignee">Исполнитель</option>
+          <option value="label">Лейбл</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- Label filter chips -->
+    <div style="display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <span style="font:600 12px var(--font);color:var(--muted)">Фильтр:</span>
+      <sc-for list="{{ filterChips }}" as="f" hint-placeholder-count="6">
+        <button onClick="{{ f.toggle }}" style="{{ f.style }}">{{ f.name }}</button>
+      </sc-for>
+      <sc-if value="{{ anyFilter }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ clearFilters }}" style="border:none;background:transparent;color:var(--text);font:600 12px var(--font);cursor:pointer;text-decoration:underline">сбросить</button>
+      </sc-if>
+    </div>
+
+    <!-- Progress -->
+    <div style="margin-top:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--colrad);padding:18px 20px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font:600 12px var(--font);color:var(--muted)">Общий прогресс</span>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font:800 34px/1 var(--font);color:var(--text);letter-spacing:-.03em">{{ donePct }}%</span>
+            <span style="font:600 13px var(--font);color:var(--muted)">готово из {{ totalCount }} задач</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <sc-for list="{{ progressLegend }}" as="l" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="width:10px;height:10px;border-radius:3px;background:{{ l.dot }};flex:none"></span>
+              <span style="font:700 14px var(--font);color:var(--text)">{{ l.count }}</span>
+              <span style="font:500 12px var(--font);color:var(--muted)">{{ l.name }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;height:12px;border-radius:20px;background:var(--track);gap:3px;padding:0">
+        <sc-for list="{{ progressSegs }}" as="s" hint-placeholder-count="3">
+          <div title="{{ s.name }}" style="{{ s.style }}"></div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- BOARD -->
+    <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;gap:16px;margin-top:22px;overflow-x:auto;padding-bottom:14px;align-items:flex-start">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="3">
+          <div data-key="{{ col.key }}" onDragOver="{{ onDragOver }}" onDrop="{{ onDrop }}" style="{{ col.style }}">
+            <div style="display:flex;align-items:center;gap:9px;padding:2px 4px 0">
+              <span style="width:9px;height:9px;border-radius:3px;background:{{ col.dot }}"></span>
+              <span style="font:700 15px var(--font);color:var(--text)">{{ col.name }}</span>
+              <span style="margin-left:auto;font:600 12px 'JetBrains Mono',monospace;color:var(--muted);background:var(--chip);border:1px solid var(--border);padding:2px 9px;border-radius:20px">{{ col.count }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--cardgap);margin-top:12px">
+              <sc-for list="{{ col.tasks }}" as="task" hint-placeholder-count="2">
+                <div draggable="true" data-id="{{ task.id }}" onDragStart="{{ onDragStart }}" onDragEnd="{{ onDragEnd }}" onClick="{{ task.open }}" style="{{ task.card }}" style-hover="border-color:var(--accent);transform:translateY(-1px)">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="{{ task.prioPill }}">{{ task.prioIcon }} {{ task.prioLabel }}</span>
+                    <span style="font:600 12px 'JetBrains Mono',monospace;color:var(--muted);margin-left:auto">#{{ task.num }}</span>
+                  </div>
+                  <div style="font:700 var(--titlesize)/1.32 var(--font);color:var(--text);letter-spacing:-.01em">{{ task.title }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ task.labels }}" as="lb" hint-placeholder-count="2">
+                      <span style="{{ lb.style }}">{{ lb.name }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px">
+                    <div style="display:flex;align-items:center">
+                      <sc-for list="{{ task.people }}" as="p" hint-placeholder-count="1">
+                        <span title="{{ p.name }}" style="{{ p.style }}">{{ p.initial }}</span>
+                      </sc-for>
+                      <span style="font:500 12px var(--font);color:var(--muted);margin-left:8px">{{ task.who }}</span>
+                    </div>
+                    <a href="#" onClick="{{ stop }}" style="font:600 12px var(--font);color:var(--text);text-decoration:none;opacity:.6">GitHub ↗</a>
+                  </div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                <div style="font:500 13px var(--font);color:var(--muted);padding:16px 6px;text-align:center;border:1px dashed var(--border);border-radius:var(--rad)">Перетащите сюда</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ canAddCol }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ addColumn }}" style="flex:none;width:150px;min-height:120px;border:1px dashed var(--border);background:transparent;color:var(--muted);font:600 14px var(--font);border-radius:var(--colrad);cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent)">+ Колонка</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- LIST -->
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:22px;display:flex;flex-direction:column;gap:22px">
+        <sc-for list="{{ columns }}" as="col" hint-placeholder-count="3">
+          <div>
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+              <span style="width:9px;height:9px;border-radius:3px;background:{{ col.dot }}"></span>
+              <span style="font:700 14px var(--font);color:var(--text)">{{ col.name }}</span>
+              <span style="font:600 12px 'JetBrains Mono',monospace;color:var(--muted)">{{ col.count }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--rad);overflow:hidden">
+              <sc-for list="{{ col.tasks }}" as="task" hint-placeholder-count="3">
+                <div onClick="{{ task.open }}" style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--card-bg);cursor:pointer" style-hover="background:var(--chip)">
+                  <span style="{{ task.prioStyle }}">{{ task.prioIcon }}</span>
+                  <span style="font:600 12px 'JetBrains Mono',monospace;color:var(--muted);width:44px">#{{ task.num }}</span>
+                  <span style="font:600 14px var(--font);color:var(--text);flex:1;min-width:120px">{{ task.title }}</span>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <sc-for list="{{ task.labels }}" as="lb" hint-placeholder-count="1">
+                      <span style="{{ lb.style }}">{{ lb.name }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;width:110px;justify-content:flex-end">
+                    <sc-for list="{{ task.people }}" as="p" hint-placeholder-count="1">
+                      <span title="{{ p.name }}" style="{{ p.style }}">{{ p.initial }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- TABLE -->
+    <sc-if value="{{ isTable }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:22px;border:1px solid var(--border);border-radius:var(--rad);overflow:hidden">
+        <div style="display:grid;grid-template-columns:60px 1fr 150px 200px 130px 110px;gap:0;background:var(--chip);border-bottom:1px solid var(--border);padding:11px 16px;font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--muted)">
+          <span>#</span><span>ЗАДАЧА</span><span>СТАТУС</span><span>ЛЕЙБЛЫ</span><span>ИСПОЛНИТЕЛЬ</span><span>ПРИОРИТЕТ</span>
+        </div>
+        <sc-for list="{{ tableRows }}" as="task" hint-placeholder-count="8">
+          <div onClick="{{ task.open }}" style="display:grid;grid-template-columns:60px 1fr 150px 200px 130px 110px;gap:0;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--card-bg);cursor:pointer" style-hover="background:var(--chip)">
+            <span style="font:600 12px 'JetBrains Mono',monospace;color:var(--muted)">#{{ task.num }}</span>
+            <span style="font:600 14px var(--font);color:var(--text);padding-right:12px">{{ task.title }}</span>
+            <span style="font:600 12px var(--font);color:{{ task.statusColor }}">{{ task.statusName }}</span>
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <sc-for list="{{ task.labels }}" as="lb" hint-placeholder-count="1">
+                <span style="{{ lb.style }}">{{ lb.name }}</span>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <sc-for list="{{ task.people }}" as="p" hint-placeholder-count="1">
+                <span title="{{ p.name }}" style="{{ p.style }}">{{ p.initial }}</span>
+              </sc-for>
+            </div>
+            <span style="{{ task.prioBadge }}">{{ task.prioIcon }} {{ task.prioLabel }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <!-- New task modal -->
+  <sc-if value="{{ showNew }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeNew }}" style="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50;animation:fbfade .16s ease">
+      <div onClick="{{ stop }}" style="width:100%;max-width:540px;max-height:90vh;overflow-y:auto;background:var(--card-bg);border:1px solid var(--border);border-radius:18px;box-shadow:0 40px 90px -24px rgba(15,20,35,.35);animation:fbpop .22s cubic-bezier(.2,.8,.3,1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:22px 24px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <span style="font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:var(--muted)">НОВАЯ ЗАДАЧА</span>
+            <h2 style="margin:0;font:800 21px var(--font);color:var(--text);letter-spacing:-.01em">Создать issue</h2>
+          </div>
+          <button onClick="{{ closeNew }}" style="border:none;background:var(--chip);color:var(--muted);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:19px;line-height:1" style-hover="background:var(--border)">×</button>
+        </div>
+
+        <div style="padding:22px 24px;display:flex;flex-direction:column;gap:20px">
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Название</label>
+            <input value="{{ draftTitle }}" onInput="{{ onDraftTitle }}" placeholder="Что нужно сделать?" style="width:100%;border:1px solid var(--border);background:var(--field);color:var(--text);font:600 15px var(--font);padding:12px 14px;border-radius:11px;outline:none" style-focus="border-color:var(--accent)"/>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Описание</label>
+            <textarea value="{{ draftDesc }}" onInput="{{ onDraftDesc }}" placeholder="Контекст, шаги воспроизведения, ссылки…" rows="3" style="width:100%;border:1px solid var(--border);background:var(--field);color:var(--text);font:500 14px/1.5 var(--font);padding:12px 14px;border-radius:11px;outline:none;resize:vertical" style-focus="border-color:var(--accent)"></textarea>
+          </div>
+
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <div style="flex:1;min-width:210px">
+              <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Статус</label>
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                <sc-for list="{{ draftStatusPills }}" as="s" hint-placeholder-count="3">
+                  <button onClick="{{ s.pick }}" style="{{ s.style }}"><span style="width:7px;height:7px;border-radius:2px;background:{{ s.dot }}"></span>{{ s.name }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Приоритет</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ draftPrioPills }}" as="p" hint-placeholder-count="5">
+                <button onClick="{{ p.pick }}" style="{{ p.style }}">{{ p.icon }} {{ p.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Лейблы</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ draftLabelChips }}" as="lb" hint-placeholder-count="6">
+                <button onClick="{{ lb.toggle }}" style="{{ lb.style }}">{{ lb.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Исполнители</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ draftPeopleChips }}" as="p" hint-placeholder-count="5">
+                <button onClick="{{ p.toggle }}" style="{{ p.style }}"><span style="{{ p.av }}">{{ p.initial }}</span>{{ p.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding:18px 24px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--card-bg)">
+          <button onClick="{{ closeNew }}" style="border:1px solid var(--border);background:transparent;color:var(--text);font:600 14px var(--font);padding:11px 18px;border-radius:11px;cursor:pointer">Отмена</button>
+          <button onClick="{{ submitNew }}" style="border:none;background:var(--accent);color:var(--accent-ink);font:700 14px var(--font);padding:11px 22px;border-radius:11px;cursor:pointer" style-hover="filter:brightness(1.12)">Создать задачу</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Task view/edit modal (centered) -->
+  <sc-if value="{{ editOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeTask }}" style="position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:50;animation:fbfade .16s ease">
+      <div onClick="{{ stop }}" style="width:100%;max-width:620px;max-height:90vh;overflow-y:auto;background:var(--card-bg);border:1px solid var(--border);border-radius:18px;box-shadow:0 40px 90px -24px rgba(15,20,35,.35);animation:fbpop .22s cubic-bezier(.2,.8,.3,1)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font:600 13px 'JetBrains Mono',monospace;color:var(--muted)">#{{ editNum }}</span>
+            <a href="#" onClick="{{ stop }}" style="display:inline-flex;align-items:center;gap:5px;font:600 12px var(--font);color:var(--text);opacity:.6;text-decoration:none">GitHub ↗</a>
+          </div>
+          <button onClick="{{ closeTask }}" style="border:none;background:var(--chip);color:var(--muted);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:19px;line-height:1" style-hover="background:var(--border)">×</button>
+        </div>
+
+        <div style="padding:22px 24px;display:flex;flex-direction:column;gap:20px">
+          <input value="{{ editTitle }}" onInput="{{ onEditTitle }}" placeholder="Название задачи" style="width:100%;border:1px solid transparent;background:transparent;color:var(--text);font:800 22px/1.3 var(--font);padding:6px 8px;margin:-6px -8px;border-radius:10px;outline:none;letter-spacing:-.01em" style-focus="border-color:var(--border);background:var(--field)"/>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Описание</label>
+            <textarea value="{{ editDesc }}" onInput="{{ onEditDesc }}" placeholder="Добавьте описание…" rows="4" style="width:100%;border:1px solid var(--border);background:var(--field);color:var(--text);font:500 14px/1.55 var(--font);padding:12px 14px;border-radius:11px;outline:none;resize:vertical" style-focus="border-color:var(--accent)"></textarea>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Статус</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ editStatusPills }}" as="s" hint-placeholder-count="3">
+                <button onClick="{{ s.pick }}" style="{{ s.style }}"><span style="width:7px;height:7px;border-radius:2px;background:{{ s.dot }}"></span>{{ s.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Приоритет</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ editPrioPills }}" as="p" hint-placeholder-count="5">
+                <button onClick="{{ p.pick }}" style="{{ p.style }}">{{ p.icon }} {{ p.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Лейблы</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ editLabelChips }}" as="lb" hint-placeholder-count="6">
+                <button onClick="{{ lb.toggle }}" style="{{ lb.style }}">{{ lb.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font:700 12px var(--font);color:var(--text);margin-bottom:8px">Исполнители</label>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              <sc-for list="{{ editPeopleChips }}" as="p" hint-placeholder-count="5">
+                <button onClick="{{ p.toggle }}" style="{{ p.style }}"><span style="{{ p.av }}">{{ p.initial }}</span>{{ p.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;padding:18px 24px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--card-bg)">
+          <button onClick="{{ deleteTask }}" style="border:1px solid var(--danger-bd);background:transparent;color:var(--danger);font:600 14px var(--font);padding:11px 16px;border-radius:11px;cursor:pointer" style-hover="background:var(--danger-bg)">Удалить</button>
+          <div style="margin-left:auto;display:flex;gap:10px">
+            <button onClick="{{ closeTask }}" style="border:1px solid var(--border);background:transparent;color:var(--text);font:600 14px var(--font);padding:11px 18px;border-radius:11px;cursor:pointer">Закрыть</button>
+            <button onClick="{{ saveTask }}" style="border:none;background:var(--accent);color:var(--accent-ink);font:700 14px var(--font);padding:11px 22px;border-radius:11px;cursor:pointer" style-hover="filter:brightness(1.12)">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1500,&quot;height&quot;:940}}">
+class Component extends DCLogic {
+  state = {
+    view: 'board',
+    groupBy: 'status',
+    query: '',
+    filters: [],
+    showNew: false,
+    openId: null,
+    overCol: null,
+    statuses: [
+      { key: 'todo', name: 'К выполнению', dot: '#f59e0b' },
+      { key: 'progress', name: 'В работе', dot: '#2563eb' },
+      { key: 'done', name: 'Готово', dot: '#16a34a' },
+    ],
+    draft: { title: '', desc: '', status: 'todo', prio: 'medium', labels: [], people: [] },
+    edit: null,
+    tasks: this.seed(),
+  };
+
+  PEOPLE = {
+    'Liis17': '#2563eb', 'Fooxboy': '#db2777', 'Nika': '#7c3aed',
+    'Deniz': '#0891b2', 'Marta': '#ca8a04',
+  };
+
+  // [bg, text]
+  LABELS = {
+    'Доработка': ['#dcfce7', '#15803d'],
+    'Важность': ['#fee2e2', '#b91c1c'],
+    'Android': ['#ecfccb', '#4d7c0f'],
+    'Backend': ['#dbeafe', '#1d4ed8'],
+    'Фича': ['#fce7f3', '#be185d'],
+    'Bug': ['#ffedd5', '#c2410c'],
+    'Frontend': ['#cffafe', '#0e7490'],
+    'UI/UX': ['#ede9fe', '#6d28d9'],
+  };
+
+  PRIO_ORDER = ['urgent', 'high', 'medium', 'low', 'none'];
+  PRIO = {
+    urgent: { icon: '🔥', label: 'Срочно', color: '#dc2626', bg: '#fef2f2' },
+    high: { icon: '↑', label: 'Высокий', color: '#ea580c', bg: '#fff7ed' },
+    medium: { icon: '=', label: 'Средний', color: '#ca8a04', bg: '#fefce8' },
+    low: { icon: '↓', label: 'Низкий', color: '#64748b', bg: '#f1f5f9' },
+    none: { icon: '·', label: 'Без', color: '#94a3b8', bg: '#f8fafc' },
+  };
+
+  VARS = {
+    '--bg': '#f5f6f8', '--text': '#16181d', '--muted': '#6b7280',
+    '--card-bg': '#ffffff', '--chip': '#eef0f3', '--field': '#f7f8fa',
+    '--border': '#e4e6ea', '--track': '#e9ebef',
+    '--accent': '#16181d', '--accent-ink': '#ffffff',
+    '--scrim': 'rgba(22,24,29,.4)',
+    '--danger': '#dc2626', '--danger-bd': '#f0c4c4', '--danger-bg': '#fef2f2',
+    '--rad': '10px', '--colrad': '14px', '--colbg': 'transparent', '--colpad': '4px',
+    '--cardpad': '14px', '--cardgap': '9px', '--titlesize': '14px', '--colw': '332px',
+    '--font': "'Manrope',system-ui,sans-serif", '--colborder': 'transparent', '--cardborder': '#e4e6ea',
+    '--shadow': '0 1px 3px rgba(20,25,40,.07)',
+  };
+
+  componentWillMount() { if (!this.state.tasks) this.setState({ tasks: this.seed() }); }
+
+  seed() {
+    const L = (...n) => n.map(x => ({ name: x }));
+    const d = (title, ...rest) => rest;
+    return [
+      { id: 1, num: 318, title: 'Доработать внешний вид голосовых сообщений и UI/UX голосовых', desc: 'Обновить волновую визуализацию, состояние воспроизведения и раскладку под Android. Согласовать с макетами в Figma.', status: 'todo', prio: 'urgent', labels: L('Доработка', 'Важность', 'Android'), people: ['Liis17'] },
+      { id: 2, num: 317, title: 'Реализовать архив чатов', desc: 'Свайп для архивации, отдельный раздел «Архив», синхронизация статуса между устройствами.', status: 'todo', prio: 'high', labels: L('Backend', 'Фича'), people: ['Fooxboy', 'Liis17'] },
+      { id: 3, num: 316, title: 'Реализовать закреплённые чаты', desc: '', status: 'todo', prio: 'medium', labels: L('Backend', 'Фича'), people: ['Fooxboy', 'Liis17'] },
+      { id: 4, num: 315, title: 'Пофиксить дёрганье списка при получении сообщения', desc: 'Список подпрыгивает при вставке нового элемента сверху — нужно сохранять позицию скролла.', status: 'todo', prio: 'high', labels: L('Bug', 'Frontend'), people: ['Nika'] },
+      { id: 5, num: 314, title: 'Свайп для быстрого ответа на сообщение', desc: '', status: 'todo', prio: 'low', labels: L('Фича', 'Android'), people: ['Deniz'] },
+      { id: 6, num: 311, title: 'Переработать экран настроек уведомлений', desc: 'Сгруппировать переключатели, добавить предпросмотр звука.', status: 'progress', prio: 'medium', labels: L('UI/UX', 'Доработка'), people: ['Marta'] },
+      { id: 7, num: 309, title: 'Кэширование медиа для оффлайна', desc: '', status: 'progress', prio: 'high', labels: L('Backend'), people: ['Fooxboy'] },
+      { id: 8, num: 319, title: 'Добавить к результату в поиске поле с личным чатом', desc: '', status: 'done', prio: 'none', labels: L('Frontend'), people: [] },
+      { id: 9, num: 307, title: 'Добавить возможность сменить размер стикеров в чате', desc: '', status: 'done', prio: 'medium', labels: L('Фича', 'Android'), people: ['Liis17'] },
+      { id: 10, num: 302, title: 'Добавить фичу с форматом отображения времени последнего онлайна', desc: '', status: 'done', prio: 'low', labels: L('Фича', 'Android'), people: ['Liis17'] },
+      { id: 11, num: 298, title: 'Тёмная тема для экрана профиля', desc: '', status: 'done', prio: 'low', labels: L('UI/UX'), people: ['Marta'] },
+      { id: 12, num: 295, title: 'Оптимизировать загрузку истории сообщений', desc: 'Пагинация по 50, предзагрузка при подходе к границе.', status: 'done', prio: 'high', labels: L('Backend', 'Доработка'), people: ['Fooxboy', 'Nika'] },
+    ];
+  }
+
+  // ---- helpers ----
+  labelObj = (lb) => {
+    const c = this.LABELS[lb.name] || ['#e2e8f0', '#475569'];
+    return { name: lb.name, style: `display:inline-flex;align-items:center;font:700 11.5px var(--font);padding:3px 9px;border-radius:20px;background:${c[0]};color:${c[1]};white-space:nowrap` };
+  };
+  personObj = (name, i) => {
+    const col = this.PEOPLE[name] || '#64748b';
+    return { name, initial: name[0].toUpperCase(), style: `display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:${col};color:#fff;font:700 11px var(--font);border:2px solid var(--card-bg);margin-left:${i ? '-8px' : '0'}` };
+  };
+  prioStyle = (p) => `display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;font-size:12px;font-weight:700;color:${this.PRIO[p].color}`;
+  statusName = (k) => (this.state.statuses.find(s => s.key === k) || {}).name || k;
+  statusColor = (k) => (this.state.statuses.find(s => s.key === k) || {}).dot || 'var(--muted)';
+
+  decorate = (t) => ({
+    ...t,
+    open: () => this.openTask(t.id),
+    card: `display:flex;flex-direction:column;gap:9px;background:var(--card-bg);border:1px solid var(--cardborder);border-left:3px solid ${this.PRIO[t.prio].color};border-radius:var(--rad);padding:var(--cardpad);cursor:grab;transition:.14s ease;box-shadow:var(--shadow)`,
+    prioStyle: this.prioStyle(t.prio),
+    prioIcon: this.PRIO[t.prio].icon,
+    prioLabel: this.PRIO[t.prio].label,
+    prioPill: `display:inline-flex;align-items:center;gap:4px;font:700 11px var(--font);color:${this.PRIO[t.prio].color};background:${this.PRIO[t.prio].bg};border:1px solid ${this.PRIO[t.prio].color}2e;padding:3px 9px;border-radius:6px`,
+    prioBadge: `display:inline-flex;align-items:center;gap:4px;font:700 11px var(--font);color:${this.PRIO[t.prio].color};background:${this.PRIO[t.prio].bg};padding:3px 9px;border-radius:6px`,
+    labels: t.labels.map(this.labelObj),
+    people: t.people.map(this.personObj),
+    who: t.people.length ? t.people.join(', ') : 'Не назначен',
+    statusName: this.statusName(t.status),
+    statusColor: this.statusColor(t.status),
+  });
+
+  visibleTasks() {
+    const q = this.state.query.trim().toLowerCase();
+    const f = this.state.filters;
+    return this.state.tasks.filter(t => {
+      if (q && !(t.title.toLowerCase().includes(q) || String(t.num).includes(q))) return false;
+      if (f.length && !f.every(x => t.labels.some(l => l.name === x))) return false;
+      return true;
+    });
+  }
+
+  buildColumns() {
+    const tasks = this.visibleTasks().map(this.decorate);
+    const g = this.state.groupBy;
+    let defs;
+    if (g === 'status') defs = this.state.statuses.map(s => ({ key: s.key, name: s.name, dot: s.dot, match: t => t.status === s.key }));
+    else if (g === 'assignee') {
+      defs = Object.keys(this.PEOPLE).map(n => ({ key: n, name: n, dot: this.PEOPLE[n], match: t => t.people.includes(n) }));
+      defs.push({ key: '__none', name: 'Не назначен', dot: '#94a3b8', match: t => !t.people.length });
+    } else {
+      defs = Object.keys(this.LABELS).map(n => ({ key: n, name: n, dot: this.LABELS[n][1], match: t => t.labels.some(l => l.name === n) }));
+    }
+    return defs.map(d => {
+      const list = tasks.filter(d.match);
+      return {
+        key: d.key, name: d.name, dot: d.dot, count: list.length, tasks: list, empty: list.length === 0,
+        style: `flex:none;width:var(--colw);background:var(--colbg);border:1px solid ${this.state.overCol === d.key ? 'var(--accent)' : 'var(--colborder)'};border-radius:var(--colrad);padding:var(--colpad);transition:border-color .15s`,
+      };
+    });
+  }
+
+  // pill builders (current value + pick handler)
+  statusPills(current, pick) {
+    return this.state.statuses.map(s => {
+      const on = current === s.key;
+      return { name: s.name, dot: s.dot, pick,
+        style: `display:inline-flex;align-items:center;gap:7px;border:1px solid ${on ? 'var(--accent)' : 'var(--border)'};background:${on ? 'var(--accent)' : 'var(--field)'};color:${on ? 'var(--accent-ink)' : 'var(--text)'};font:600 13px var(--font);padding:8px 13px;border-radius:9px;cursor:pointer`,
+        _pick: () => pick(s.key) };
+    }).map(p => ({ ...p, pick: p._pick }));
+  }
+  prioPills(current, pick) {
+    return this.PRIO_ORDER.map(k => {
+      const on = current === k; const p = this.PRIO[k];
+      return { icon: p.icon, label: p.label, pick: () => pick(k),
+        style: `display:inline-flex;align-items:center;gap:5px;border:1px solid ${on ? p.color : 'var(--border)'};background:${on ? p.color : 'var(--field)'};color:${on ? '#fff' : 'var(--text)'};font:600 13px var(--font);padding:8px 13px;border-radius:9px;cursor:pointer` };
+    });
+  }
+  labelChips(selected, toggle) {
+    return Object.keys(this.LABELS).map(n => {
+      const on = selected.includes(n); const c = this.LABELS[n];
+      return { name: n, toggle: () => toggle(n),
+        style: `border:1px solid ${on ? c[1] : 'var(--border)'};background:${on ? c[0] : 'var(--field)'};color:${on ? c[1] : 'var(--muted)'};font:600 12.5px var(--font);padding:6px 12px;border-radius:20px;cursor:pointer` };
+    });
+  }
+  peopleChips(selected, toggle) {
+    return Object.keys(this.PEOPLE).map(n => {
+      const on = selected.includes(n); const col = this.PEOPLE[n];
+      return { name: n, initial: n[0].toUpperCase(), toggle: () => toggle(n),
+        av: `display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:${col};color:#fff;font:700 9px var(--font)`,
+        style: `display:inline-flex;align-items:center;gap:7px;border:1px solid ${on ? 'var(--accent)' : 'var(--border)'};background:${on ? 'var(--accent)' : 'var(--field)'};color:${on ? 'var(--accent-ink)' : 'var(--text)'};font:600 13px var(--font);padding:6px 13px 6px 7px;border-radius:20px;cursor:pointer` };
+    });
+  }
+
+  renderVals() {
+    if (!this.state.tasks) return {};
+    const st = this.state;
+    const rootStyle = Object.entries(this.VARS).map(([k, v]) => `${k}:${v}`).join(';') +
+      `;background:var(--bg);min-height:100vh;font-family:var(--font);color:var(--text)`;
+
+    const all = st.tasks;
+    const donePct = all.length ? Math.round(all.filter(t => t.status === 'done').length / all.length * 100) : 0;
+
+    const progressSegs = st.statuses.map(s => {
+      const c = all.filter(t => t.status === s.key).length;
+      const pct = all.length ? (c / all.length * 100) : 0;
+      return { name: `${s.name}: ${c}`, style: `width:${pct}%;background:${s.dot};border-radius:6px;transition:width .3s` };
+    });
+    const progressLegend = st.statuses.map(s => ({
+      name: s.name, dot: s.dot, count: all.filter(t => t.status === s.key).length,
+    }));
+
+    const cnt = (k) => all.filter(t => t.status === k).length;
+    const urgentN = all.filter(t => (t.prio === 'urgent' || t.prio === 'high') && t.status !== 'done').length;
+    const badgeCard = `background:var(--card-bg);border:1px solid var(--border);border-radius:var(--colrad);padding:15px 16px;box-shadow:var(--shadow)`;
+    const dotStyle = (c) => `width:9px;height:9px;border-radius:50%;background:${c};display:inline-block;flex:none`;
+    const statBadges = [
+      { label: 'Всего задач', value: all.length, sub: 'issues', subColor: 'var(--muted)', card: badgeCard, dot: dotStyle('#94a3b8') },
+      { label: 'Готово', value: cnt('done'), sub: `${donePct}%`, subColor: '#16a34a', card: badgeCard, dot: dotStyle('#16a34a') },
+      { label: 'В работе', value: cnt('progress'), sub: 'активны', subColor: '#2563eb', card: badgeCard, dot: dotStyle('#2563eb') },
+      { label: 'К выполнению', value: cnt('todo'), sub: 'в очереди', subColor: '#f59e0b', card: badgeCard, dot: dotStyle('#f59e0b') },
+      { label: 'Приоритетные', value: urgentN, sub: urgentN ? 'требуют внимания' : 'нет', subColor: urgentN ? '#dc2626' : 'var(--muted)', card: badgeCard, dot: dotStyle('#dc2626') },
+    ];
+
+    const tab = (v) => `border:none;border-radius:calc(var(--rad) - 3px);padding:7px 14px;font:600 13px var(--font);cursor:pointer;background:${st.view === v ? 'var(--accent)' : 'transparent'};color:${st.view === v ? 'var(--accent-ink)' : 'var(--muted)'}`;
+
+    const filterChips = Object.keys(this.LABELS).map(n => {
+      const on = st.filters.includes(n); const c = this.LABELS[n];
+      return { name: n, toggle: () => this.setState(s => ({ filters: on ? s.filters.filter(x => x !== n) : [...s.filters, n] })),
+        style: `border:1px solid ${on ? c[1] : 'var(--border)'};background:${on ? c[0] : 'transparent'};color:${on ? c[1] : 'var(--muted)'};font:600 12px var(--font);padding:5px 11px;border-radius:20px;cursor:pointer` };
+    });
+
+    const columns = this.buildColumns();
+    const tableRows = this.visibleTasks().map(this.decorate);
+
+    // draft (new task)
+    const d = st.draft;
+    const draftStatusPills = this.statusPills(d.status, (k) => this.setDraft('status', k));
+    const draftPrioPills = this.prioPills(d.prio, (k) => this.setDraft('prio', k));
+    const draftLabelChips = this.labelChips(d.labels, (n) => this.toggleDraft('labels', n));
+    const draftPeopleChips = this.peopleChips(d.people, (n) => this.toggleDraft('people', n));
+
+    // edit (existing task)
+    const e = st.edit;
+    const editVals = e ? {
+      editOpen: true, editNum: e.num, editTitle: e.title, editDesc: e.desc,
+      editStatusPills: this.statusPills(e.status, (k) => this.setEdit('status', k)),
+      editPrioPills: this.prioPills(e.prio, (k) => this.setEdit('prio', k)),
+      editLabelChips: this.labelChips(e.labels, (n) => this.toggleEdit('labels', n)),
+      editPeopleChips: this.peopleChips(e.people, (n) => this.toggleEdit('people', n)),
+      onEditTitle: (ev) => this.setEdit('title', ev.target.value),
+      onEditDesc: (ev) => this.setEdit('desc', ev.target.value),
+    } : { editOpen: false };
+
+    return {
+      rootStyle, groupBy: st.groupBy, query: st.query,
+      isBoard: st.view === 'board', isList: st.view === 'list', isTable: st.view === 'table',
+      tabBoard: tab('board'), tabList: tab('list'), tabTable: tab('table'),
+      filterChips, anyFilter: st.filters.length > 0,
+      clearFilters: () => this.setState({ filters: [] }),
+      columns, tableRows, canAddCol: st.groupBy === 'status',
+      donePct, totalCount: all.length, progressSegs, progressLegend, statBadges,
+      openNew: () => this.setState({ showNew: true }),
+      closeNew: () => this.setState({ showNew: false }),
+      showNew: st.showNew,
+      closeTask: () => this.setState({ edit: null, openId: null }),
+      setBoard: () => this.setState({ view: 'board' }),
+      setList: () => this.setState({ view: 'list' }),
+      setTable: () => this.setState({ view: 'table' }),
+      onSearch: (ev) => this.setState({ query: ev.target.value }),
+      onGroup: (ev) => this.setState({ groupBy: ev.target.value, overCol: null }),
+      addColumn: () => this.addColumn(),
+      onDragStart: (ev) => { this.dragId = +ev.currentTarget.dataset.id; ev.dataTransfer.effectAllowed = 'move'; ev.currentTarget.style.opacity = '.4'; },
+      onDragEnd: (ev) => { ev.currentTarget.style.opacity = '1'; },
+      onDragOver: (ev) => { ev.preventDefault(); const k = ev.currentTarget.dataset.key; if (k !== st.overCol) this.setState({ overCol: k }); },
+      onDrop: (ev) => { ev.preventDefault(); this.moveTask(this.dragId, ev.currentTarget.dataset.key); this.setState({ overCol: null }); },
+      stop: (ev) => { ev.preventDefault(); ev.stopPropagation(); },
+      draftTitle: d.title, draftDesc: d.desc,
+      onDraftTitle: (ev) => this.setDraft('title', ev.target.value),
+      onDraftDesc: (ev) => this.setDraft('desc', ev.target.value),
+      draftStatusPills, draftPrioPills, draftLabelChips, draftPeopleChips,
+      submitNew: () => this.submitNew(),
+      deleteTask: () => this.deleteTask(),
+      saveTask: () => this.saveTask(),
+      ...editVals,
+    };
+  }
+
+  openTask(id) {
+    const t = this.state.tasks.find(x => x.id === id);
+    if (!t) return;
+    this.setState({ openId: id, edit: { id: t.id, num: t.num, title: t.title, desc: t.desc || '', status: t.status, prio: t.prio, labels: t.labels.map(l => l.name), people: [...t.people] } });
+  }
+
+  setDraft(k, v) { this.setState(s => ({ draft: { ...s.draft, [k]: v } })); }
+  toggleDraft(k, v) { this.setState(s => { const a = s.draft[k]; return { draft: { ...s.draft, [k]: a.includes(v) ? a.filter(x => x !== v) : [...a, v] } }; }); }
+  setEdit(k, v) { this.setState(s => ({ edit: { ...s.edit, [k]: v } })); }
+  toggleEdit(k, v) { this.setState(s => { const a = s.edit[k]; return { edit: { ...s.edit, [k]: a.includes(v) ? a.filter(x => x !== v) : [...a, v] } }; }); }
+
+  moveTask(id, key) {
+    const g = this.state.groupBy;
+    this.setState(s => ({
+      tasks: s.tasks.map(t => {
+        if (t.id !== id) return t;
+        if (g === 'status') return { ...t, status: key };
+        if (g === 'assignee') return { ...t, people: key === '__none' ? [] : [key] };
+        if (g === 'label') return t.labels.some(l => l.name === key) ? t : { ...t, labels: [...t.labels, { name: key }] };
+        return t;
+      }),
+    }));
+  }
+
+  addColumn() {
+    const name = window.prompt('Название колонки:', 'На проверке');
+    if (!name) return;
+    const key = 'col' + Date.now();
+    const palette = ['#db2777', '#7c3aed', '#0891b2', '#ca8a04', '#ea580c'];
+    this.setState(s => ({ statuses: [...s.statuses, { key, name, dot: palette[s.statuses.length % palette.length] }] }));
+  }
+
+  submitNew() {
+    const d = this.state.draft;
+    if (!d.title.trim()) return;
+    const maxNum = Math.max(...this.state.tasks.map(t => t.num), 300);
+    const task = { id: Date.now(), num: maxNum + 1, title: d.title.trim(), desc: d.desc.trim(), status: d.status, prio: d.prio, labels: d.labels.map(n => ({ name: n })), people: [...d.people] };
+    this.setState(s => ({ tasks: [task, ...s.tasks], showNew: false, draft: { title: '', desc: '', status: 'todo', prio: 'medium', labels: [], people: [] } }));
+  }
+
+  saveTask() {
+    const e = this.state.edit;
+    if (!e || !e.title.trim()) return;
+    this.setState(s => ({
+      tasks: s.tasks.map(t => t.id === e.id ? { ...t, title: e.title.trim(), desc: e.desc.trim(), status: e.status, prio: e.prio, labels: e.labels.map(n => ({ name: n })), people: [...e.people] } : t),
+      edit: null, openId: null,
+    }));
+  }
+
+  deleteTask() {
+    const e = this.state.edit;
+    if (!e) return;
+    this.setState(s => ({ tasks: s.tasks.filter(t => t.id !== e.id), edit: null, openId: null }));
+  }
+}
+</script>
+</body>
+</html>
