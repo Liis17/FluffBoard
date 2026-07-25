@@ -1,12 +1,14 @@
 // Чистые функции над списком задач: фильтрация, группировка, метрики.
 // Соответствуют docs/handoff_fluffboard_board/03-state-and-data.md.
 
+// Уровень читается по числу огоньков — так важность и помечали в репозитории до перехода
+// на служебные лейблы. У «Без» знака нет: пустая строка означает «не рисовать».
 export const priorities = [
-  { id: 'urgent', title: 'Срочно', icon: '🔥', color: '#dc2626', bg: '#fef2f2' },
-  { id: 'high', title: 'Высокий', icon: '↑', color: '#ea580c', bg: '#fff7ed' },
-  { id: 'medium', title: 'Средний', icon: '=', color: '#ca8a04', bg: '#fefce8' },
-  { id: 'low', title: 'Низкий', icon: '↓', color: '#64748b', bg: '#f1f5f9' },
-  { id: 'none', title: 'Без', icon: '·', color: '#94a3b8', bg: '#f8fafc' },
+  { id: 'urgent', title: 'Срочно', icon: '🔥🔥🔥', color: '#dc2626', bg: '#fef2f2' },
+  { id: 'high', title: 'Высокий', icon: '🔥🔥', color: '#ea580c', bg: '#fff7ed' },
+  { id: 'medium', title: 'Средний', icon: '🔥', color: '#ca8a04', bg: '#fefce8' },
+  { id: 'low', title: 'Низкий', icon: '❄️', color: '#64748b', bg: '#f1f5f9' },
+  { id: 'none', title: 'Без', icon: '', color: '#94a3b8', bg: '#f8fafc' },
 ]
 
 // Каталог платформ закрыт и повторяет PlatformCatalog бэкенда: там он нужен для валидации

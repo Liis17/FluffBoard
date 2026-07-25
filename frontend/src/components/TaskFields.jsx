@@ -1,5 +1,6 @@
 import { getLabelColors, platforms, priorities } from '../board.js'
 import { Avatar } from './atoms.jsx'
+import { Icon } from './icons.jsx'
 
 function toggle(current, value) {
   return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
@@ -41,7 +42,7 @@ export function TaskFields({ draft, statuses, labels, candidates, onChange }) {
               style={draft.priority === level.id ? { background: level.color, borderColor: level.color } : undefined}
               onClick={() => patch({ priority: level.id })}
             >
-              <span aria-hidden="true">{level.icon}</span>
+              {level.icon && <span aria-hidden="true">{level.icon}</span>}
               {level.title}
             </button>
           ))}
@@ -63,7 +64,7 @@ export function TaskFields({ draft, statuses, labels, candidates, onChange }) {
                 style={active ? { background: platform.color, borderColor: platform.color } : undefined}
                 onClick={() => patch({ platforms: toggle(draft.platforms, platform.id) })}
               >
-                <span className="pill-dot" style={active ? { background: '#fff' } : { background: platform.color }} />
+                <Icon name={platform.id} />
                 {platform.title}
               </button>
             )

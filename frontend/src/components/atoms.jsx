@@ -14,7 +14,7 @@ export function PriorityPill({ priority, bare = false }) {
         border: bare ? '1px solid transparent' : `1px solid ${level.color}2e`,
       }}
     >
-      <span aria-hidden="true">{level.icon}</span>
+      {level.icon && <span aria-hidden="true">{level.icon}</span>}
       {level.title}
     </span>
   )
