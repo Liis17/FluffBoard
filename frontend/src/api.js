@@ -3,7 +3,8 @@ export async function api(path, options = {}) {
     credentials: 'include',
     ...options,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      // У FormData заголовок ставит сам браузер: ему нужно дописать границу multipart.
+      ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     },
   })

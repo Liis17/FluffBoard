@@ -24,6 +24,20 @@ export const actions = [
   { name: 'quote', title: 'Цитата', prefix: '> ' },
 ]
 
+/** Разметка загруженной картинки: подписью остаётся имя файла, как это делает GitHub. */
+export function imageSnippet(asset) {
+  return `![${asset.name}](${asset.url})`
+}
+
+/** Вставка на место курсора; выделенный текст заменяется, курсор встаёт после вставки. */
+export function insertText(value, start, end, text) {
+  return {
+    value: value.slice(0, start) + text + value.slice(end),
+    start: start + text.length,
+    end: start + text.length,
+  }
+}
+
 /**
  * Возвращает новое значение поля и выделение, которое нужно восстановить.
  * Префикс ставится с начала строки, в которой стоит курсор, — иначе список начинался

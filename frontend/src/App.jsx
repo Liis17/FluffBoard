@@ -216,6 +216,13 @@ function App() {
     }
   }
 
+  // Файл уходит как есть, без JSON: base64 раздул бы его на треть.
+  async function uploadAsset(file) {
+    const body = new FormData()
+    body.append('file', file)
+    return api('/api/board/assets', { method: 'POST', body })
+  }
+
   // Ошибку не глотаем: её показывает модалка, где метку и заводят, а общий баннер она перекрывает.
   // Порядок совпадает с тем, в котором метки приходят из GitHub, — по алфавиту без учёта регистра.
   async function createLabel(name) {
@@ -324,6 +331,7 @@ function App() {
           onClose={() => setCreating(null)}
           onCreate={(task) => save(task)}
           onCreateLabel={createLabel}
+          onUpload={uploadAsset}
         />
       )}
 
@@ -338,6 +346,7 @@ function App() {
           onClose={() => setOpenNumber(null)}
           onSave={(task) => save(task, openIssue.number)}
           onCreateLabel={createLabel}
+          onUpload={uploadAsset}
         />
       )}
     </div>

@@ -13,7 +13,7 @@ const emptyDraft = {
   platforms: [],
 }
 
-export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate, onCreateLabel }) {
+export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate, onCreateLabel, onUpload }) {
   const [draft, setDraft] = useState({ ...emptyDraft, ...prefill })
 
   function submit(event) {
@@ -53,6 +53,7 @@ export function NewTaskModal({ prefill, statuses, labels, candidates, saving, on
               rows={3}
               placeholder="Контекст, шаги воспроизведения, ссылки…"
               onChange={(body) => setDraft({ ...draft, body })}
+              onUpload={onUpload}
             />
           </div>
 

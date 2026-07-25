@@ -51,7 +51,13 @@ public sealed class GitHubClient(HttpClient httpClient)
     // Цвета создаваемых колонок и меток берутся по кругу — 01-tokens.md, раздел про статусы.
     private static readonly string[] CustomLabelPalette = ["db2777", "7c3aed", "0891b2", "ca8a04", "ea580c"];
 
+    // Вложения задач лежат в отдельной ветке-хранилище: у GitHub нет публичного API для
+    // вложений issue, а класть картинки в рабочую ветку — засорять её историю.
+    private const string AssetsBranch = "board-assets";
+
     private static readonly ConcurrentDictionary<string, byte> EnsuredLabels = new();
+
+    private static readonly ConcurrentDictionary<string, byte> EnsuredBranches = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -234,6 +240,36 @@ public sealed class GitHubClient(HttpClient httpClient)
         return ToIssue(response);
     }
 
+    /// <summary>
+    /// Кладёт вложение в ветку-хранилище и возвращает ссылку на него. Имя файла в путь не идёт:
+    /// оно пришло от пользователя и может быть каким угодно, а совпадения имён затирали бы
+    /// чужие картинки. Настоящее имя остаётся подписью в разметке.
+    /// </summary>
+    public async Task<GitHubAsset> UploadAssetAsync(
+        string owner,
+        string repository,
+        string fileName,
+        string extension,
+        byte[] content,
+        CancellationToken cancellationToken)
+    {
+        await EnsureAssetsBranchAsync(owner, repository, cancellationToken);
+
+        var path = $"assets/{DateTime.UtcNow:yyyy-MM}/{Guid.NewGuid():N}{extension}";
+        var response = await SendAsync<GitHubContentResponse>(
+            HttpMethod.Put,
+            $"repos/{RepositoryPath(owner, repository)}/contents/{path}",
+            new
+            {
+                message = $"board: вложение {fileName}",
+                content = Convert.ToBase64String(content),
+                branch = AssetsBranch
+            },
+            cancellationToken);
+
+        return new GitHubAsset(fileName, response.Content.DownloadUrl);
+    }
+
     public static bool IsServiceLabel(string name) =>
         name.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase) ||
         name.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase) ||
@@ -305,6 +341,62 @@ public sealed class GitHubClient(HttpClient httpClient)
 
             EnsuredLabels[cacheKey] = 0;
         }
+    }
+
+    /// <summary>
+    /// Заводит ветку-хранилище, если её ещё нет. Ветка сиротская — коммит без родителей, только
+    /// с пояснительным README: она хранит вложения, а не историю кода, и не должна выглядеть
+    /// отставшей копией рабочей ветки.
+    /// </summary>
+    private async Task EnsureAssetsBranchAsync(string owner, string repository, CancellationToken cancellationToken)
+    {
+        var cacheKey = $"{owner}/{repository}";
+        if (EnsuredBranches.ContainsKey(cacheKey))
+        {
+            return;
+        }
+
+        var repositoryPath = RepositoryPath(owner, repository);
+        using var probe = await httpClient.GetAsync($"repos/{repositoryPath}/git/ref/heads/{AssetsBranch}", cancellationToken);
+
+        if (probe.StatusCode == HttpStatusCode.NotFound)
+        {
+            var tree = await SendAsync<GitHubShaResponse>(
+                HttpMethod.Post,
+                $"repos/{repositoryPath}/git/trees",
+                new
+                {
+                    tree = new[]
+                    {
+                        new
+                        {
+                            path = "README.md",
+                            mode = "100644",
+                            type = "blob",
+                            content = "Вложения задач FluffBoard. Ветка создана доской, коммитить сюда руками не нужно.\n"
+                        }
+                    }
+                },
+                cancellationToken);
+
+            var commit = await SendAsync<GitHubShaResponse>(
+                HttpMethod.Post,
+                $"repos/{repositoryPath}/git/commits",
+                new { message = "board: хранилище вложений", tree = tree.Sha, parents = Array.Empty<string>() },
+                cancellationToken);
+
+            await SendAsync<JsonElement>(
+                HttpMethod.Post,
+                $"repos/{repositoryPath}/git/refs",
+                new { @ref = $"refs/heads/{AssetsBranch}", sha = commit.Sha },
+                cancellationToken);
+        }
+        else
+        {
+            await EnsureSuccessAsync(probe);
+        }
+
+        EnsuredBranches[cacheKey] = 0;
     }
 
     private async Task<List<T>> GetAllAsync<T>(string path, CancellationToken cancellationToken)
@@ -488,6 +580,13 @@ public sealed class GitHubClient(HttpClient httpClient)
 
     private sealed record GitHubLabelResponse(string Name, string Color);
 
+    private sealed record GitHubShaResponse(string Sha);
+
+    private sealed record GitHubContentResponse(GitHubContentFile Content);
+
+    private sealed record GitHubContentFile(
+        [property: JsonPropertyName("download_url")] string DownloadUrl);
+
     private sealed record GitHubAssigneeResponse(
         string Login,
         [property: JsonPropertyName("avatar_url")] string AvatarUrl);
@@ -514,6 +613,8 @@ public sealed record GitHubLabel(string Name, string Color);
 public sealed record GitHubAssignee(string Login, string AvatarUrl);
 
 public sealed record BoardStatus(string Key, string Name, string Color);
+
+public sealed record GitHubAsset(string Name, string Url);
 
 public sealed record IssueDraft(
     string Title,

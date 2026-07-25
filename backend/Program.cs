@@ -98,6 +98,10 @@ app.MapPost("/api/auth/logout", async (HttpContext context) =>
 
 var board = app.MapGroup("/api/board").RequireAuthorization();
 
+// Вложение уезжает в git-историю навсегда, поэтому размер ограничен, а список расширений закрыт.
+const long MaxAssetBytes = 5 * 1024 * 1024;
+string[] AllowedAssetExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
 board.MapGet("/me", async (ClaimsPrincipal principal, BoardDatabase database, CancellationToken cancellationToken) =>
 {
     var userId = GetUserId(principal);
@@ -139,6 +143,49 @@ board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, 
         return ToGitHubProblem(exception);
     }
 });
+
+board.MapPost("/assets", async (
+    IFormFile file,
+    GitHubClient gitHubClient,
+    BoardOptions options,
+    CancellationToken cancellationToken) =>
+{
+    if (file.Length == 0)
+    {
+        return Results.BadRequest(new { detail = "Файл пустой." });
+    }
+
+    if (file.Length > MaxAssetBytes)
+    {
+        return Results.BadRequest(new { detail = $"Файл больше {MaxAssetBytes / (1024 * 1024)} МБ." });
+    }
+
+    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+    if (!AllowedAssetExtensions.Contains(extension))
+    {
+        return Results.BadRequest(new { detail = "Прикрепить можно только png, jpg, gif или webp." });
+    }
+
+    try
+    {
+        using var stream = new MemoryStream();
+        await file.CopyToAsync(stream, cancellationToken);
+        var asset = await gitHubClient.UploadAssetAsync(
+            options.Repository.Owner,
+            options.Repository.Name,
+            Path.GetFileName(file.FileName),
+            extension,
+            stream.ToArray(),
+            cancellationToken);
+        return Results.Ok(asset);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+})
+// Сессия живёт в cookie с SameSite=Lax, поэтому чужая страница этот POST не отправит.
+.DisableAntiforgery();
 
 board.MapGet("/assignees", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
 {

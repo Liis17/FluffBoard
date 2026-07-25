@@ -70,6 +70,13 @@ const shapes = {
     </>
   ),
   quote: <path d="M6 16h2.5a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6M15.5 16H18a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-2.5a2 2 0 0 0-2 2v6" />,
+  image: (
+    <>
+      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+      <path d="m3.5 16 4.5-4.5 4 4 3-2.5 5 4.5" />
+      <path d="M9 9.5h.01" />
+    </>
+  ),
 }
 
 export function Icon({ name }) {
