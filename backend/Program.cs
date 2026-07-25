@@ -174,7 +174,7 @@ board.MapPost("/issues", async (
                 request.Title.Trim(),
                 request.Body?.Trim(),
                 NormalizeLabels(request.Labels),
-                NormalizeAssignees(request.Assignee),
+                NormalizeAssignees(request.Assignees),
                 NormalizeStatus(request.Status),
                 NormalizePriority(request.Priority)),
             cancellationToken);
@@ -209,7 +209,7 @@ board.MapPut("/issues/{number:int}", async (
                 request.Title.Trim(),
                 request.Body?.Trim(),
                 NormalizeLabels(request.Labels),
-                NormalizeAssignees(request.Assignee),
+                NormalizeAssignees(request.Assignees),
                 NormalizeStatus(request.Status),
                 NormalizePriority(request.Priority)),
             cancellationToken);
@@ -273,8 +273,11 @@ static string NormalizeStatus(string? status) => string.IsNullOrWhiteSpace(statu
 
 static string NormalizePriority(string? priority) => string.IsNullOrWhiteSpace(priority) ? "none" : priority.Trim();
 
-static IReadOnlyList<string> NormalizeAssignees(string? assignee) =>
-    string.IsNullOrWhiteSpace(assignee) ? [] : [assignee.Trim()];
+static IReadOnlyList<string> NormalizeAssignees(IReadOnlyList<string>? assignees) => assignees?
+    .Select(assignee => assignee.Trim())
+    .Where(assignee => assignee.Length > 0)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToList() ?? [];
 
 static bool IsGitHubFailure(Exception exception) => exception is GitHubApiException or HttpRequestException;
 
@@ -297,6 +300,6 @@ public sealed record IssueRequest(
     string Title,
     string? Body,
     IReadOnlyList<string>? Labels,
-    string? Assignee,
+    IReadOnlyList<string>? Assignees,
     string? Status,
     string? Priority);

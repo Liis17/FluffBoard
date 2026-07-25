@@ -14,6 +14,27 @@ function getPriority(id) {
   return priorities.find((priority) => priority.id === id) || priorities.at(-1)
 }
 
+// Назначить можно и логин, которого нет среди участников доски: в репозитории такие уже есть.
+// Логины GitHub регистронезависимы, поэтому склейка идёт без учёта регистра, а показывается
+// написание из задач — оно совпадает с настоящим.
+function getAssigneeCandidates(issues, users) {
+  const candidates = new Map()
+
+  for (const issue of issues) {
+    for (const assignee of issue.assignees) {
+      candidates.set(assignee.login.toLowerCase(), assignee.login)
+    }
+  }
+
+  for (const user of users) {
+    if (user.gitHubLogin && !candidates.has(user.gitHubLogin.toLowerCase())) {
+      candidates.set(user.gitHubLogin.toLowerCase(), user.gitHubLogin)
+    }
+  }
+
+  return [...candidates.values()].sort((left, right) => left.localeCompare(right))
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'include',
@@ -33,21 +54,17 @@ async function api(path, options = {}) {
   return data
 }
 
-function TaskEditor({ issue, statuses, labels, users, onCancel, onSave, saving }) {
+function toggle(current, value) {
+  return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+}
+
+function TaskEditor({ issue, statuses, labels, candidates, onCancel, onSave, saving }) {
   const [title, setTitle] = useState(issue?.title || '')
   const [body, setBody] = useState(issue?.body || '')
   const [status, setStatus] = useState(issue?.status || 'todo')
   const [priority, setPriority] = useState(issue?.priority || 'medium')
   const [selectedLabels, setSelectedLabels] = useState(() => issue?.labels.map((label) => label.name) || [])
-  const [assignee, setAssignee] = useState(issue?.assignees[0]?.login || '')
-
-  function toggleLabel(labelName) {
-    setSelectedLabels((current) => (
-      current.includes(labelName)
-        ? current.filter((label) => label !== labelName)
-        : [...current, labelName]
-    ))
-  }
+  const [assignees, setAssignees] = useState(() => issue?.assignees.map((assignee) => assignee.login) || [])
 
   function submit(event) {
     event.preventDefault()
@@ -55,7 +72,7 @@ function TaskEditor({ issue, statuses, labels, users, onCancel, onSave, saving }
       title,
       body,
       labels: selectedLabels,
-      assignee: assignee || null,
+      assignees,
       status,
       priority,
     })
@@ -92,20 +109,22 @@ function TaskEditor({ issue, statuses, labels, users, onCancel, onSave, saving }
             {priorities.map((level) => <option value={level.id} key={level.id}>{level.title}</option>)}
           </select>
         </label>
-        <label>
-          Исполнитель
-          <select value={assignee} onChange={(event) => setAssignee(event.target.value)}>
-            <option value="">Не назначен</option>
-            {assignee && !users.some((user) => user.gitHubLogin === assignee) && (
-              <option value={assignee}>@{assignee} (аккаунт GitHub не привязан к доске)</option>
-            )}
-            {users.filter((user) => user.gitHubLogin).map((user) => (
-              <option value={user.gitHubLogin} key={user.id}>
-                {user.username} (@{user.gitHubLogin})
-              </option>
+        <fieldset>
+          <legend>Исполнители</legend>
+          <div className="label-picker">
+            {candidates.map((login) => (
+              <label className="label-option" key={login}>
+                <input
+                  type="checkbox"
+                  checked={assignees.includes(login)}
+                  onChange={() => setAssignees((current) => toggle(current, login))}
+                />
+                @{login}
+              </label>
             ))}
-          </select>
-        </label>
+            {candidates.length === 0 && <span className="empty">Некого назначить: у участников доски не привязан GitHub.</span>}
+          </div>
+        </fieldset>
         <fieldset>
           <legend>Метки GitHub</legend>
           <div className="label-picker">
@@ -114,7 +133,7 @@ function TaskEditor({ issue, statuses, labels, users, onCancel, onSave, saving }
                 <input
                   type="checkbox"
                   checked={selectedLabels.includes(label.name)}
-                  onChange={() => toggleLabel(label.name)}
+                  onChange={() => setSelectedLabels((current) => toggle(current, label.name))}
                 />
                 <span className="label-dot" style={{ backgroundColor: `#${label.color}` }} />
                 {label.name}
@@ -330,7 +349,7 @@ function App() {
           issue={editorIssue}
           statuses={statuses}
           labels={labels}
-          users={users}
+          candidates={getAssigneeCandidates(issues, users)}
           onCancel={() => setEditorIssue(undefined)}
           onSave={saveTask}
           saving={saving}
