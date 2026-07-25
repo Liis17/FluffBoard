@@ -1,4 +1,4 @@
-import { getLabelColors, priorities } from '../board.js'
+import { getLabelColors, platforms, priorities } from '../board.js'
 import { Avatar } from './atoms.jsx'
 
 function toggle(current, value) {
@@ -45,6 +45,29 @@ export function TaskFields({ draft, statuses, labels, candidates, onChange }) {
               {level.title}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="field-group">
+        {/* Платформ у задачи может быть несколько — это выбор, а не переключатель. */}
+        <span className="field-label">Платформы</span>
+        <div className="pill-row">
+          {platforms.map((platform) => {
+            const active = draft.platforms.includes(platform.id)
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                aria-pressed={active}
+                className={active ? 'pill pill-active' : 'pill'}
+                style={active ? { background: platform.color, borderColor: platform.color } : undefined}
+                onClick={() => patch({ platforms: toggle(draft.platforms, platform.id) })}
+              >
+                <span className="pill-dot" style={active ? { background: '#fff' } : { background: platform.color }} />
+                {platform.title}
+              </button>
+            )
+          })}
         </div>
       </div>
 

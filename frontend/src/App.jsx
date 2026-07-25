@@ -255,7 +255,7 @@ function App() {
       )}
 
       {!loading && board.view === 'table' && (
-        <TableView issues={filtered} statuses={statuses} onOpen={(issue) => setOpenNumber(issue.number)} />
+        <TableView columns={columns} statuses={statuses} onOpen={(issue) => setOpenNumber(issue.number)} />
       )}
 
       {!loading && board.view === 'board' && (

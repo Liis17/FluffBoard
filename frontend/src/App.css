@@ -665,6 +665,16 @@
   font-size: 11.5px;
 }
 
+/* Платформа — контурный чип: так она читается как измерение, а не как метка GitHub. */
+.platform-chip {
+  border: 1px solid;
+  border-radius: 6px;
+  background: var(--card-bg);
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+
 .avatar-stack {
   display: flex;
   align-items: center;
@@ -798,9 +808,25 @@
 .table-head,
 .table-row {
   display: grid;
-  grid-template-columns: 60px 1fr 150px 200px 130px 110px;
+  grid-template-columns: 60px 1fr 130px 190px 190px 120px 110px;
   align-items: center;
   gap: 12px;
+}
+
+/* Заголовок группы разрывает сетку строк, поэтому это отдельный flex-ряд. */
+.table-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chip);
+  padding: 9px 16px;
+}
+
+.table-group h2 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .table-head {
@@ -821,7 +847,7 @@
   cursor: pointer;
 }
 
-.table-row:last-child {
+.table-view > :last-child {
   border-bottom: 0;
 }
 

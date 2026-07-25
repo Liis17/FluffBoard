@@ -12,6 +12,7 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
     priority: issue.priority,
     labels: issue.labels.map((label) => label.name),
     assignees: issue.assignees.map((assignee) => assignee.login),
+    platforms: issue.platforms,
   }))
 
   function submit(event) {

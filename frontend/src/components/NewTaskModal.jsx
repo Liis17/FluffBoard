@@ -2,7 +2,15 @@ import { useState } from 'react'
 import { Modal } from './Modal.jsx'
 import { TaskFields } from './TaskFields.jsx'
 
-const emptyDraft = { title: '', body: '', status: 'todo', priority: 'medium', labels: [], assignees: [] }
+const emptyDraft = {
+  title: '',
+  body: '',
+  status: 'todo',
+  priority: 'medium',
+  labels: [],
+  assignees: [],
+  platforms: [],
+}
 
 export function NewTaskModal({ statuses, labels, candidates, saving, onClose, onCreate }) {
   const [draft, setDraft] = useState(emptyDraft)

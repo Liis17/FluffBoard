@@ -1,4 +1,4 @@
-import { getAvatarColor, getLabelColors, getPriority } from '../board.js'
+import { getAvatarColor, getLabelColors, getPlatform, getPriority } from '../board.js'
 
 export function PriorityPill({ priority, bare = false }) {
   const level = getPriority(priority)
@@ -20,6 +20,17 @@ export function PriorityPill({ priority, bare = false }) {
 
 export function LabelChip({ label }) {
   return <span className="label-chip" style={getLabelColors(label.color)}>{label.name}</span>
+}
+
+/** Платформа отличается от лейбла контуром: цвет берётся из каталога, а не из GitHub. */
+export function PlatformChip({ id }) {
+  const platform = getPlatform(id)
+
+  return (
+    <span className="platform-chip" style={{ color: platform.color, borderColor: `${platform.color}55` }}>
+      {platform.title}
+    </span>
+  )
 }
 
 export function Avatar({ login, size = 24 }) {

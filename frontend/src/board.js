@@ -9,8 +9,20 @@ export const priorities = [
   { id: 'none', title: 'Без', icon: '·', color: '#94a3b8', bg: '#f8fafc' },
 ]
 
+// Каталог платформ закрыт и повторяет PlatformCatalog бэкенда: там он нужен для валидации
+// и цвета лейбла, здесь — для отображения. Так же устроен priorities.
+export const platforms = [
+  { id: 'backend', title: 'Бэкенд', color: '#1d76db' },
+  { id: 'web', title: 'Веб', color: '#688b0b' },
+  { id: 'windows', title: 'Windows', color: '#8644f4' },
+  { id: 'mac', title: 'macOS', color: '#475569' },
+  { id: 'android', title: 'Android', color: '#6aa218' },
+  { id: 'iphone', title: 'iPhone', color: '#0891b2' },
+]
+
 export const groupings = [
   { id: 'status', title: 'Статус' },
+  { id: 'platform', title: 'Платформа' },
   { id: 'assignee', title: 'Исполнитель' },
   { id: 'label', title: 'Лейбл' },
 ]
@@ -26,9 +38,14 @@ const emptyColor = '#94a3b8'
 
 export const unassignedKey = '__none'
 export const unlabelledKey = '__nolabel'
+export const noPlatformKey = '__noplatform'
 
 export function getPriority(id) {
   return priorities.find((priority) => priority.id === id) || priorities.at(-1)
+}
+
+export function getPlatform(id) {
+  return platforms.find((platform) => platform.id === id)
 }
 
 function parseHex(hex) {
@@ -93,6 +110,27 @@ export function visibleTasks(issues, query, filters) {
 }
 
 export function buildColumns(issues, groupBy, { statuses, candidates, labels }) {
+  if (groupBy === 'platform') {
+    const columns = platforms.map((platform) => ({
+      key: platform.id,
+      name: platform.title,
+      color: platform.color,
+      droppable: true,
+      // Как и у исполнителя, измерение многозначное: задача под несколько платформ
+      // попадает в несколько колонок, поэтому карточек больше, чем задач.
+      issues: issues.filter((issue) => issue.platforms.includes(platform.id)),
+    }))
+
+    // Сбросить сюда нельзя: это означало бы снять все платформы разом.
+    return [...columns, {
+      key: noPlatformKey,
+      name: 'Без платформы',
+      color: emptyColor,
+      droppable: false,
+      issues: issues.filter((issue) => issue.platforms.length === 0),
+    }]
+  }
+
   if (groupBy === 'assignee') {
     const columns = candidates.map((login) => ({
       key: login,
@@ -146,6 +184,15 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
  * по которому построены колонки. Возвращает null, если менять нечего.
  */
 export function getMoveOverrides(issue, groupBy, columnKey) {
+  if (groupBy === 'platform') {
+    // Платформа добавляется, а не заменяет остальные: 19 задач репозитория честно
+    // относятся сразу к нескольким, и перенос не должен это стирать.
+    if (columnKey === noPlatformKey || issue.platforms.includes(columnKey)) {
+      return null
+    }
+    return { platforms: [...issue.platforms, columnKey] }
+  }
+
   if (groupBy === 'assignee') {
     const assignees = columnKey === unassignedKey ? [] : [columnKey]
     const unchanged = issue.assignees.length === assignees.length
@@ -173,6 +220,7 @@ export function toPayload(issue, overrides = {}) {
     assignees: issue.assignees.map((assignee) => assignee.login),
     status: issue.status,
     priority: issue.priority,
+    platforms: issue.platforms,
     ...overrides,
   }
 }

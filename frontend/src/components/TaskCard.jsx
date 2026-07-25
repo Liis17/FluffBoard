@@ -1,5 +1,5 @@
 import { getPriority } from '../board.js'
-import { AvatarStack, GitHubLink, LabelChip, PriorityPill } from './atoms.jsx'
+import { AvatarStack, GitHubLink, LabelChip, PlatformChip, PriorityPill } from './atoms.jsx'
 
 export function TaskCard({ issue, onOpen, dragging, onDragStart, onDragEnd }) {
   return (
@@ -23,8 +23,9 @@ export function TaskCard({ issue, onOpen, dragging, onDragStart, onDragEnd }) {
 
       <h3 className="task-title">{issue.title}</h3>
 
-      {issue.labels.length > 0 && (
+      {(issue.platforms.length > 0 || issue.labels.length > 0) && (
         <div className="task-labels">
+          {issue.platforms.map((platform) => <PlatformChip key={platform} id={platform} />)}
           {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
         </div>
       )}
