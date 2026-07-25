@@ -14,11 +14,17 @@ public sealed class GitHubClient(HttpClient httpClient)
     private const string DoneStatus = "done";
     private const string NoPriority = "none";
 
+    // Порядок каталога — это порядок колонок доски: путь задачи слева направо. «Отложено» стоит
+    // за «Готово», потому что оно вне этого пути, а не следующий его шаг. Цвета трёх исходных
+    // статусов из 01-tokens.md, у добавленных взяты из палитры пользовательских колонок оттуда же.
     private static readonly ServiceLabelEntry[] StatusCatalog =
     [
+        new("planning", "Планирование", "7c3aed"),
         new(DefaultStatus, "К выполнению", "f59e0b"),
         new("in-progress", "В работе", "2563eb"),
-        new(DoneStatus, "Готово", "16a34a")
+        new("testing", "Тестирование", "0891b2"),
+        new(DoneStatus, "Готово", "16a34a"),
+        new("deferred", "Отложено", "64748b")
     ];
 
     private static readonly ServiceLabelEntry[] PriorityCatalog =
