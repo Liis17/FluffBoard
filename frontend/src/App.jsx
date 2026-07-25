@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { api } from './api.js'
-import { buildColumns, getMetrics, getProgress, visibleTasks } from './board.js'
+import {
+  applyOverrides,
+  buildColumns,
+  getMetrics,
+  getMoveOverrides,
+  getProgress,
+  toPayload,
+  visibleTasks,
+} from './board.js'
 import { BoardView } from './components/BoardView.jsx'
 import { Header } from './components/Header.jsx'
 import { LabelFilter } from './components/LabelFilter.jsx'
@@ -165,6 +173,45 @@ function App() {
     }
   }
 
+  // Карточка переезжает в интерфейсе сразу, а при отказе GitHub возвращается на место.
+  async function moveTask(number, columnKey) {
+    const issue = issues.find((candidate) => candidate.number === number)
+    const overrides = issue && getMoveOverrides(issue, board.groupBy, columnKey)
+    if (!overrides) {
+      return
+    }
+
+    const restore = issues
+    setIssues((current) => current.map((item) => (
+      item.number === number ? applyOverrides(item, overrides, labels) : item
+    )))
+    setError('')
+
+    try {
+      const saved = await api(`/api/board/issues/${number}`, {
+        method: 'PUT',
+        body: JSON.stringify(toPayload(issue, overrides)),
+      })
+      setIssues((current) => current.map((item) => (item.number === number ? saved : item)))
+    } catch (requestError) {
+      setIssues(restore)
+      setError(`Не удалось перенести #${number}: ${requestError.message}`)
+    }
+  }
+
+  async function addColumn(name) {
+    setSaving(true)
+    setError('')
+    try {
+      const status = await api('/api/board/statuses', { method: 'POST', body: JSON.stringify({ name }) })
+      setStatuses((current) => [...current, status])
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!user) {
     return <LoginScreen onLogin={login} error={error} loading={loading} />
   }
@@ -206,6 +253,7 @@ function App() {
             columns={columns}
             draggedId={draggedId}
             overColumn={overColumn}
+            saving={saving}
             onOpen={(issue) => setOpenNumber(issue.number)}
             onDragStart={setDraggedId}
             onDragEnd={() => {
@@ -216,7 +264,13 @@ function App() {
               event.preventDefault()
               setOverColumn(key)
             }}
-            onDrop={() => setOverColumn(null)}
+            onDrop={(key) => {
+              setOverColumn(null)
+              if (draggedId !== null) {
+                moveTask(draggedId, key)
+              }
+            }}
+            onAddColumn={board.groupBy === 'status' ? addColumn : undefined}
           />
         )}
 

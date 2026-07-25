@@ -153,6 +153,37 @@ board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardOptions options
     }
 });
 
+board.MapPost("/statuses", async (
+    StatusRequest request,
+    GitHubClient gitHubClient,
+    BoardOptions options,
+    CancellationToken cancellationToken) =>
+{
+    var name = request.Name?.Trim() ?? "";
+    if (name.Length == 0 || name.Length > 40)
+    {
+        return Results.BadRequest(new { detail = "Column name must contain between 1 and 40 characters." });
+    }
+
+    // Двоеточие сломало бы разбор ключа: имя лейбла станет status:<name>.
+    if (name.Contains(':'))
+    {
+        return Results.BadRequest(new { detail = "Column name must not contain a colon." });
+    }
+
+    try
+    {
+        var status = await gitHubClient.CreateStatusAsync(options.Repository.Owner, options.Repository.Name, name, cancellationToken);
+        // Ключ пользовательской колонки — произвольный текст, в том числе русский, а заголовок
+        // Location обязан быть ASCII: без экранирования Kestrel рвёт уже успешный ответ.
+        return Results.Created($"/api/board/statuses/{Uri.EscapeDataString(status.Key)}", status);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+});
+
 board.MapPost("/issues", async (
     IssueRequest request,
     GitHubClient gitHubClient,
@@ -295,6 +326,8 @@ static IResult ToGitHubProblem(Exception exception) => exception switch
 };
 
 public sealed record LoginRequest(string Username, string Password);
+
+public sealed record StatusRequest(string? Name);
 
 public sealed record IssueRequest(
     string Title,

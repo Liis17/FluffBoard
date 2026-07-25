@@ -7,7 +7,12 @@ export function TaskCard({ issue, onOpen, dragging, onDragStart, onDragEnd }) {
       className={dragging ? 'task-card task-card-dragging' : 'task-card'}
       style={{ borderLeftColor: getPriority(issue.priority).color }}
       draggable
-      onDragStart={onDragStart}
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move'
+        // Без setData перетаскивание не стартует в Firefox.
+        event.dataTransfer.setData('text/plain', String(issue.number))
+        onDragStart()
+      }}
       onDragEnd={onDragEnd}
       onClick={() => onOpen(issue)}
     >

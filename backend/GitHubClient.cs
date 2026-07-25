@@ -28,6 +28,9 @@ public sealed class GitHubClient(HttpClient httpClient)
         new("low", "Низкий", "64748b")
     ];
 
+    // Цвета пользовательских колонок берутся по кругу — 01-tokens.md, раздел про статусы.
+    private static readonly string[] CustomStatusPalette = ["db2777", "7c3aed", "0891b2", "ca8a04", "ea580c"];
+
     private static readonly ConcurrentDictionary<string, byte> EnsuredLabels = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -85,6 +88,29 @@ public sealed class GitHubClient(HttpClient httpClient)
             .Select(status => new BoardStatus(status.Key, status.Key, status.Color)));
 
         return statuses;
+    }
+
+    public async Task<BoardStatus> CreateStatusAsync(
+        string owner,
+        string repository,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var existing = await GetStatusesAsync(owner, repository, cancellationToken);
+        if (existing.Any(status => KeysEqual(status.Key, name)))
+        {
+            throw new GitHubApiException(HttpStatusCode.Conflict, "Колонка с таким названием уже есть.");
+        }
+
+        var customCount = existing.Count(status => CatalogIndex(StatusCatalog, status.Key) == int.MaxValue);
+        var color = CustomStatusPalette[customCount % CustomStatusPalette.Length];
+        var label = await SendAsync<GitHubLabelResponse>(
+            HttpMethod.Post,
+            $"repos/{RepositoryPath(owner, repository)}/labels",
+            new { name = StatusPrefix + name, color },
+            cancellationToken);
+
+        return new BoardStatus(name, name, label.Color);
     }
 
     public async Task<GitHubIssue> CreateIssueAsync(

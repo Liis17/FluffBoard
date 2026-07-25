@@ -1,6 +1,18 @@
+import { AddColumn } from './AddColumn.jsx'
 import { TaskCard } from './TaskCard.jsx'
 
-export function BoardView({ columns, draggedId, overColumn, onOpen, onDragStart, onDragEnd, onDragOver, onDrop }) {
+export function BoardView({
+  columns,
+  draggedId,
+  overColumn,
+  saving,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  onAddColumn,
+}) {
   return (
     <div className="board" role="list">
       {columns.map((column) => (
@@ -8,8 +20,8 @@ export function BoardView({ columns, draggedId, overColumn, onOpen, onDragStart,
           className={overColumn === column.key ? 'board-column board-column-over' : 'board-column'}
           key={column.key}
           role="listitem"
-          onDragOver={(event) => onDragOver(event, column.key)}
-          onDrop={() => onDrop(column.key)}
+          onDragOver={column.droppable ? (event) => onDragOver(event, column.key) : undefined}
+          onDrop={column.droppable ? () => onDrop(column.key) : undefined}
         >
           <header className="column-head">
             <span className="column-dot" style={{ background: column.color }} />
@@ -28,10 +40,16 @@ export function BoardView({ columns, draggedId, overColumn, onOpen, onDragStart,
                 onDragEnd={onDragEnd}
               />
             ))}
-            {column.issues.length === 0 && <p className="column-empty">Перетащите сюда</p>}
+            {column.issues.length === 0 && (
+              <p className="column-empty">{column.droppable ? 'Перетащите сюда' : 'Пусто'}</p>
+            )}
           </div>
         </section>
       ))}
+
+      {/* Новую колонку можно завести только при группировке по статусу: колонки
+          исполнителей и лейблов задаются данными, а не пользователем. */}
+      {onAddColumn && <AddColumn saving={saving} onAdd={onAddColumn} />}
     </div>
   )
 }

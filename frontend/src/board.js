@@ -98,6 +98,7 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       key: login,
       name: login,
       color: getAvatarColor(login),
+      droppable: true,
       // Задача с несколькими исполнителями попадает в несколько колонок — это осознанно.
       issues: issues.filter((issue) => issue.assignees.some((assignee) => assignee.login === login)),
     }))
@@ -106,6 +107,7 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       key: unassignedKey,
       name: 'Не назначен',
       color: emptyColor,
+      droppable: true,
       issues: issues.filter((issue) => issue.assignees.length === 0),
     }]
   }
@@ -115,14 +117,17 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       key: label.name,
       name: label.name,
       color: `#${label.color}`,
+      droppable: true,
       issues: issues.filter((issue) => issue.labels.some((own) => own.name === label.name)),
     }))
 
     // В макете задач без лейблов не видно; на реальных данных они есть, и терять их нельзя.
+    // Бросать сюда нечего: это означало бы снять все лейблы разом, чего никто не ожидает.
     return [...columns, {
       key: unlabelledKey,
       name: 'Без лейбла',
       color: emptyColor,
+      droppable: false,
       issues: issues.filter((issue) => issue.labels.length === 0),
     }]
   }
@@ -131,8 +136,59 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
     key: status.key,
     name: status.name,
     color: `#${status.color}`,
+    droppable: true,
     issues: issues.filter((issue) => issue.status === status.key),
   }))
+}
+
+/**
+ * Что меняется при переносе карточки: перетаскивание правит именно то поле,
+ * по которому построены колонки. Возвращает null, если менять нечего.
+ */
+export function getMoveOverrides(issue, groupBy, columnKey) {
+  if (groupBy === 'assignee') {
+    const assignees = columnKey === unassignedKey ? [] : [columnKey]
+    const unchanged = issue.assignees.length === assignees.length
+      && issue.assignees.every((assignee) => assignee.login === assignees[0])
+    return unchanged ? null : { assignees }
+  }
+
+  if (groupBy === 'label') {
+    // Лейбл добавляется, а не заменяет остальные; повторное добавление игнорируется.
+    if (columnKey === unlabelledKey || issue.labels.some((label) => label.name === columnKey)) {
+      return null
+    }
+    return { labels: [...issue.labels.map((label) => label.name), columnKey] }
+  }
+
+  return issue.status === columnKey ? null : { status: columnKey }
+}
+
+/** PUT заменяет задачу целиком, поэтому в запрос идут все поля, а не только изменённые. */
+export function toPayload(issue, overrides = {}) {
+  return {
+    title: issue.title,
+    body: issue.body,
+    labels: issue.labels.map((label) => label.name),
+    assignees: issue.assignees.map((assignee) => assignee.login),
+    status: issue.status,
+    priority: issue.priority,
+    ...overrides,
+  }
+}
+
+/** Оптимистичная версия задачи: те же изменения, но в форме, которую ждёт интерфейс. */
+export function applyOverrides(issue, overrides, labels) {
+  return {
+    ...issue,
+    ...overrides,
+    labels: overrides.labels
+      ? overrides.labels.map((name) => labels.find((label) => label.name === name) || { name, color: 'e2e8f0' })
+      : issue.labels,
+    assignees: overrides.assignees
+      ? overrides.assignees.map((login) => ({ login, avatarUrl: '' }))
+      : issue.assignees,
+  }
 }
 
 // Метрики и прогресс считаются по всем задачам, а не по отфильтрованным.
