@@ -13,10 +13,12 @@ import {
 import { BoardView } from './components/BoardView.jsx'
 import { Header } from './components/Header.jsx'
 import { LabelFilter } from './components/LabelFilter.jsx'
+import { ListView } from './components/ListView.jsx'
 import { LoginScreen } from './components/LoginScreen.jsx'
 import { NewTaskModal } from './components/NewTaskModal.jsx'
 import { ProgressPanel } from './components/ProgressPanel.jsx'
 import { StatTiles } from './components/StatTiles.jsx'
+import { TableView } from './components/TableView.jsx'
 import { TaskModal } from './components/TaskModal.jsx'
 import { Toolbar } from './components/Toolbar.jsx'
 
@@ -246,33 +248,41 @@ function App() {
 
       {error && <p className="message message-error" role="alert">{error}</p>}
 
-      {loading
-        ? <p className="message">Загружаем актуальные задачи из GitHub…</p>
-        : (
-          <BoardView
-            columns={columns}
-            draggedId={draggedId}
-            overColumn={overColumn}
-            saving={saving}
-            onOpen={(issue) => setOpenNumber(issue.number)}
-            onDragStart={setDraggedId}
-            onDragEnd={() => {
-              setDraggedId(null)
-              setOverColumn(null)
-            }}
-            onDragOver={(event, key) => {
-              event.preventDefault()
-              setOverColumn(key)
-            }}
-            onDrop={(key) => {
-              setOverColumn(null)
-              if (draggedId !== null) {
-                moveTask(draggedId, key)
-              }
-            }}
-            onAddColumn={board.groupBy === 'status' ? addColumn : undefined}
-          />
-        )}
+      {loading && <p className="message">Загружаем актуальные задачи из GitHub…</p>}
+
+      {!loading && board.view === 'list' && (
+        <ListView columns={columns} onOpen={(issue) => setOpenNumber(issue.number)} />
+      )}
+
+      {!loading && board.view === 'table' && (
+        <TableView issues={filtered} statuses={statuses} onOpen={(issue) => setOpenNumber(issue.number)} />
+      )}
+
+      {!loading && board.view === 'board' && (
+        <BoardView
+          columns={columns}
+          draggedId={draggedId}
+          overColumn={overColumn}
+          saving={saving}
+          onOpen={(issue) => setOpenNumber(issue.number)}
+          onDragStart={setDraggedId}
+          onDragEnd={() => {
+            setDraggedId(null)
+            setOverColumn(null)
+          }}
+          onDragOver={(event, key) => {
+            event.preventDefault()
+            setOverColumn(key)
+          }}
+          onDrop={(key) => {
+            setOverColumn(null)
+            if (draggedId !== null) {
+              moveTask(draggedId, key)
+            }
+          }}
+          onAddColumn={board.groupBy === 'status' ? addColumn : undefined}
+        />
+      )}
 
       {creating && (
         <NewTaskModal
