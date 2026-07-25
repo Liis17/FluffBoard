@@ -36,9 +36,14 @@ export const views = [
 const avatarPalette = ['#2563eb', '#db2777', '#7c3aed', '#0891b2', '#ca8a04']
 const emptyColor = '#94a3b8'
 
+// Цвет встроенного статуса «Готово»; у колонок он приходит из лейбла GitHub,
+// а здесь нужен там, где статуса под рукой нет — в полосе прогресса и метриках.
+export const doneColor = '#16a34a'
+
 export const unassignedKey = '__none'
 export const unlabelledKey = '__nolabel'
 export const noPlatformKey = '__noplatform'
+export const doneKey = '__done'
 
 export function getPriority(id) {
   return priorities.find((priority) => priority.id === id) || priorities.at(-1)
@@ -110,6 +115,30 @@ export function visibleTasks(issues, query, filters) {
 }
 
 export function buildColumns(issues, groupBy, { statuses, candidates, labels }) {
+  // Статус разбирается первым, потому что только в нём нет колонки завершённых.
+  // Незнакомый разрез (правленый вручную URL) тоже показывается статусами, как и раньше.
+  if (groupBy !== 'platform' && groupBy !== 'assignee' && groupBy !== 'label') {
+    return statuses.map((status) => ({
+      key: status.key,
+      name: status.name,
+      color: `#${status.color}`,
+      droppable: true,
+      issues: issues.filter((issue) => issue.status === status.key),
+    }))
+  }
+
+  // В любом разрезе, кроме статуса, завершённые задачи уходят в отдельную последнюю колонку:
+  // иначе они забивают колонку своей платформы или исполнителя, а видеть там нужно то,
+  // что ещё в работе. Сбросить сюда нельзя — готовность меняется в разрезе по статусу.
+  const active = issues.filter((issue) => issue.status !== 'done')
+  const doneColumn = {
+    key: doneKey,
+    name: 'Завершено',
+    color: doneColor,
+    droppable: false,
+    issues: issues.filter((issue) => issue.status === 'done'),
+  }
+
   if (groupBy === 'platform') {
     const columns = platforms.map((platform) => ({
       key: platform.id,
@@ -118,7 +147,7 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       droppable: true,
       // Как и у исполнителя, измерение многозначное: задача под несколько платформ
       // попадает в несколько колонок, поэтому карточек больше, чем задач.
-      issues: issues.filter((issue) => issue.platforms.includes(platform.id)),
+      issues: active.filter((issue) => issue.platforms.includes(platform.id)),
     }))
 
     // Сбросить сюда нельзя: это означало бы снять все платформы разом.
@@ -127,8 +156,8 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       name: 'Без платформы',
       color: emptyColor,
       droppable: false,
-      issues: issues.filter((issue) => issue.platforms.length === 0),
-    }]
+      issues: active.filter((issue) => issue.platforms.length === 0),
+    }, doneColumn]
   }
 
   if (groupBy === 'assignee') {
@@ -138,7 +167,7 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       color: getAvatarColor(login),
       droppable: true,
       // Задача с несколькими исполнителями попадает в несколько колонок — это осознанно.
-      issues: issues.filter((issue) => issue.assignees.some((assignee) => assignee.login === login)),
+      issues: active.filter((issue) => issue.assignees.some((assignee) => assignee.login === login)),
     }))
 
     return [...columns, {
@@ -146,37 +175,27 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
       name: 'Не назначен',
       color: emptyColor,
       droppable: true,
-      issues: issues.filter((issue) => issue.assignees.length === 0),
-    }]
+      issues: active.filter((issue) => issue.assignees.length === 0),
+    }, doneColumn]
   }
 
-  if (groupBy === 'label') {
-    const columns = labels.map((label) => ({
-      key: label.name,
-      name: label.name,
-      color: `#${label.color}`,
-      droppable: true,
-      issues: issues.filter((issue) => issue.labels.some((own) => own.name === label.name)),
-    }))
-
-    // В макете задач без лейблов не видно; на реальных данных они есть, и терять их нельзя.
-    // Бросать сюда нечего: это означало бы снять все лейблы разом, чего никто не ожидает.
-    return [...columns, {
-      key: unlabelledKey,
-      name: 'Без лейбла',
-      color: emptyColor,
-      droppable: false,
-      issues: issues.filter((issue) => issue.labels.length === 0),
-    }]
-  }
-
-  return statuses.map((status) => ({
-    key: status.key,
-    name: status.name,
-    color: `#${status.color}`,
+  const columns = labels.map((label) => ({
+    key: label.name,
+    name: label.name,
+    color: `#${label.color}`,
     droppable: true,
-    issues: issues.filter((issue) => issue.status === status.key),
+    issues: active.filter((issue) => issue.labels.some((own) => own.name === label.name)),
   }))
+
+  // В макете задач без лейблов не видно; на реальных данных они есть, и терять их нельзя.
+  // Бросать сюда нечего: это означало бы снять все лейблы разом, чего никто не ожидает.
+  return [...columns, {
+    key: unlabelledKey,
+    name: 'Без лейбла',
+    color: emptyColor,
+    droppable: false,
+    issues: active.filter((issue) => issue.labels.length === 0),
+  }, doneColumn]
 }
 
 /**
@@ -184,6 +203,11 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
  * по которому построены колонки. Возвращает null, если менять нечего.
  */
 export function getMoveOverrides(issue, groupBy, columnKey) {
+  // Колонка завершённых существует во всех разрезах и ни в одном не принимает перенос.
+  if (columnKey === doneKey) {
+    return null
+  }
+
   if (groupBy === 'platform') {
     // Платформа добавляется, а не заменяет остальные: 19 задач репозитория честно
     // относятся сразу к нескольким, и перенос не должен это стирать.
@@ -267,22 +291,83 @@ export function getMetrics(issues) {
   ]
 }
 
-export function getProgress(issues, statuses) {
-  const done = issues.filter((issue) => issue.status === 'done').length
+/**
+ * Разрезы по платформам и исполнителям многозначные, поэтому сумма счётчиков больше
+ * числа задач: доля считается от этой суммы, иначе полоса не заполнится целиком.
+ * Пустые сегменты отбрасываются, чтобы не засорять легенду нулями.
+ */
+function shareSegments(segments) {
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0)
 
-  return {
+  return segments
+    .filter((segment) => segment.count > 0)
+    .map((segment) => ({ ...segment, share: (segment.count / total) * 100 }))
+}
+
+/**
+ * Полоса зависит от разреза: в статусах и лейблах это доля выполненного одной заливкой,
+ * в платформах и исполнителях — распределение задач по колонкам. Завершённые задачи в
+ * распределение входят, поэтому оно показывает весь объём работы, а не только оставшийся,
+ * и с числами в колонках (там завершённых нет) намеренно не совпадает.
+ */
+export function getProgress(issues, groupBy, { statuses, candidates }) {
+  const done = issues.filter((issue) => issue.status === 'done').length
+  const base = {
     total: issues.length,
     done,
     percent: issues.length === 0 ? 0 : Math.round((done / issues.length) * 100),
-    segments: statuses.map((status) => {
-      const count = issues.filter((issue) => issue.status === status.key).length
-      return {
-        key: status.key,
-        name: status.name,
-        color: `#${status.color}`,
-        count,
-        share: issues.length === 0 ? 0 : (count / issues.length) * 100,
-      }
-    }),
+  }
+
+  if (groupBy === 'platform') {
+    return {
+      ...base,
+      mode: 'share',
+      segments: shareSegments([
+        ...platforms.map((platform) => ({
+          key: platform.id,
+          name: platform.title,
+          color: platform.color,
+          count: issues.filter((issue) => issue.platforms.includes(platform.id)).length,
+        })),
+        {
+          key: noPlatformKey,
+          name: 'Без платформы',
+          color: emptyColor,
+          count: issues.filter((issue) => issue.platforms.length === 0).length,
+        },
+      ]),
+    }
+  }
+
+  if (groupBy === 'assignee') {
+    return {
+      ...base,
+      mode: 'share',
+      segments: shareSegments([
+        ...candidates.map((login) => ({
+          key: login,
+          name: login,
+          color: getAvatarColor(login),
+          count: issues.filter((issue) => issue.assignees.some((assignee) => assignee.login === login)).length,
+        })),
+        {
+          key: unassignedKey,
+          name: 'Не назначен',
+          color: emptyColor,
+          count: issues.filter((issue) => issue.assignees.length === 0).length,
+        },
+      ]),
+    }
+  }
+
+  return {
+    ...base,
+    mode: 'completion',
+    segments: statuses.map((status) => ({
+      key: status.key,
+      name: status.name,
+      color: `#${status.color}`,
+      count: issues.filter((issue) => issue.status === status.key).length,
+    })),
   }
 }

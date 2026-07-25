@@ -134,7 +134,10 @@ function App() {
     [filtered, board.groupBy, statuses, candidates, labels],
   )
   const metrics = useMemo(() => getMetrics(issues), [issues])
-  const progress = useMemo(() => getProgress(issues, statuses), [issues, statuses])
+  const progress = useMemo(
+    () => getProgress(issues, board.groupBy, { statuses, candidates }),
+    [issues, board.groupBy, statuses, candidates],
+  )
 
   const openIssue = issues.find((issue) => issue.number === openNumber) || null
 
