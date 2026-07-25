@@ -76,6 +76,21 @@
   background: var(--border);
 }
 
+/* Иконка тянется за размером шрифта родителя, поэтому одна и та же годится и в кнопку, и в чип. */
+.icon {
+  flex: none;
+}
+
+.icon-button-busy .icon {
+  animation: icon-spin 900ms linear infinite;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .avatar {
   display: inline-grid;
   position: relative;
@@ -540,6 +555,34 @@
   margin-top: 12px;
 }
 
+/* Место в стопке кнопка занимает всегда, а видимой становится при наведении на колонку
+   или при фокусе с клавиатуры: так наведение не сдвигает карточки. */
+.column-add {
+  display: grid;
+  border: 1px dashed var(--border);
+  border-radius: var(--rad);
+  background: none;
+  padding: 7px;
+  color: var(--muted);
+  font-size: 15px;
+  opacity: 0;
+  cursor: pointer;
+  place-items: center;
+  pointer-events: none;
+  transition: opacity 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.board-column:hover .column-add,
+.column-add:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.column-add:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 /* Выглядит как карточка, чтобы занимать в стопке её место, но читается как кнопка. */
 .column-more {
   border: 1px solid var(--border);
@@ -704,6 +747,9 @@
 
 /* Платформа — контурный чип: так она читается как измерение, а не как метка GitHub. */
 .platform-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid;
   border-radius: 6px;
   background: var(--card-bg);

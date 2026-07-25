@@ -4,6 +4,7 @@ import { api } from './api.js'
 import {
   applyOverrides,
   buildColumns,
+  getColumnDraft,
   getMetrics,
   getMoveOverrides,
   getProgress,
@@ -74,7 +75,8 @@ function App() {
 
   const [board, setBoard] = useState(readView)
   const [openNumber, setOpenNumber] = useState(null)
-  const [creating, setCreating] = useState(false)
+  // Заготовка новой задачи: пустая при создании из шапки, с полем колонки — из колонки.
+  const [creating, setCreating] = useState(null)
   const [draggedId, setDraggedId] = useState(null)
   const [overColumn, setOverColumn] = useState(null)
 
@@ -169,7 +171,7 @@ function App() {
         ? api(`/api/board/issues/${number}`, { method: 'PUT', body: JSON.stringify(task) })
         : api('/api/board/issues', { method: 'POST', body: JSON.stringify(task) }))
       setOpenNumber(null)
-      setCreating(false)
+      setCreating(null)
       await loadBoard()
     } catch (requestError) {
       setError(requestError.message)
@@ -223,7 +225,13 @@ function App() {
 
   return (
     <div className="page">
-      <Header user={user} onCreate={() => setCreating(true)} onLogout={logout} />
+      <Header
+        user={user}
+        loading={loading}
+        onRefresh={loadBoard}
+        onCreate={() => setCreating({})}
+        onLogout={logout}
+      />
 
       <StatTiles metrics={metrics} />
 
@@ -283,17 +291,19 @@ function App() {
               moveTask(draggedId, key)
             }
           }}
+          onCreateTask={(key) => setCreating(getColumnDraft(board.groupBy, key))}
           onAddColumn={board.groupBy === 'status' ? addColumn : undefined}
         />
       )}
 
       {creating && (
         <NewTaskModal
+          prefill={creating}
           statuses={statuses}
           labels={labels}
           candidates={candidates}
           saving={saving}
-          onClose={() => setCreating(false)}
+          onClose={() => setCreating(null)}
           onCreate={(task) => save(task)}
         />
       )}

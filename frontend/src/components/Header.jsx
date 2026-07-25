@@ -1,6 +1,7 @@
 import { getAvatarColor } from '../board.js'
+import { Icon } from './icons.jsx'
 
-export function Header({ user, onCreate, onLogout }) {
+export function Header({ user, loading, onRefresh, onCreate, onLogout }) {
   return (
     <header className="board-header">
       <div className="board-identity">
@@ -15,6 +16,16 @@ export function Header({ user, onCreate, onLogout }) {
       </div>
 
       <div className="board-account">
+        <button
+          className={loading ? 'icon-button icon-button-busy' : 'icon-button'}
+          type="button"
+          aria-label="Обновить данные с GitHub"
+          title="Обновить данные с GitHub"
+          disabled={loading}
+          onClick={onRefresh}
+        >
+          <Icon name="refresh" />
+        </button>
         <button className="button-primary" type="button" onClick={onCreate}>+ Новая задача</button>
         <div className="board-user">
           <span className="avatar" style={{ background: getAvatarColor(user.username) }}>

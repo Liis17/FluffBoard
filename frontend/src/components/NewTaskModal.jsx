@@ -12,8 +12,8 @@ const emptyDraft = {
   platforms: [],
 }
 
-export function NewTaskModal({ statuses, labels, candidates, saving, onClose, onCreate }) {
-  const [draft, setDraft] = useState(emptyDraft)
+export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate }) {
+  const [draft, setDraft] = useState({ ...emptyDraft, ...prefill })
 
   function submit(event) {
     event.preventDefault()

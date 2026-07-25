@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getAvatarColor, getLabelColors, getPlatform, getPriority } from '../board.js'
+import { Icon } from './icons.jsx'
 
 export function PriorityPill({ priority, bare = false }) {
   const level = getPriority(priority)
@@ -23,12 +24,13 @@ export function LabelChip({ label }) {
   return <span className="label-chip" style={getLabelColors(label.color)}>{label.name}</span>
 }
 
-/** Платформа отличается от лейбла контуром: цвет берётся из каталога, а не из GitHub. */
+/** Платформа отличается от лейбла контуром и иконкой: цвет берётся из каталога, а не из GitHub. */
 export function PlatformChip({ id }) {
   const platform = getPlatform(id)
 
   return (
     <span className="platform-chip" style={{ color: platform.color, borderColor: `${platform.color}55` }}>
+      <Icon name={id} />
       {platform.title}
     </span>
   )

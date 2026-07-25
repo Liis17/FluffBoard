@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { doneKey } from '../board.js'
 import { AddColumn } from './AddColumn.jsx'
+import { Icon } from './icons.jsx'
 import { TaskCard } from './TaskCard.jsx'
 
 // Завершённых накапливаются сотни, и развёрнутая колонка растягивает доску вниз.
@@ -17,6 +18,7 @@ export function BoardView({
   onDragEnd,
   onDragOver,
   onDrop,
+  onCreateTask,
   onAddColumn,
 }) {
   // Колонка завершённых на доске одна, поэтому состояния на каждую колонку не нужно.
@@ -60,6 +62,20 @@ export function BoardView({
               )}
               {column.issues.length === 0 && (
                 <p className="column-empty">{column.droppable ? 'Перетащите сюда' : 'Пусто'}</p>
+              )}
+              {/* В «Завершено» кнопки нет: новая задача не бывает готовой и в эту колонку
+                  всё равно не попала бы. Место кнопка занимает всегда, а показывается по
+                  наведению — иначе карточки прыгали бы под курсором. */}
+              {column.key !== doneKey && (
+                <button
+                  type="button"
+                  className="column-add"
+                  aria-label={`Новая задача в «${column.name}»`}
+                  title={`Новая задача в «${column.name}»`}
+                  onClick={() => onCreateTask(column.key)}
+                >
+                  <Icon name="plus" />
+                </button>
               )}
             </div>
           </section>

@@ -235,6 +235,17 @@ export function getMoveOverrides(issue, groupBy, columnKey) {
   return issue.status === columnKey ? null : { status: columnKey }
 }
 
+/**
+ * Заготовка задачи, созданной прямо в колонке: она получает то же поле, что и карточка,
+ * перетащенная в эту колонку, поэтому правило одно на оба действия. Служебные колонки
+ * ничего не задают — задача с пустым полем и так попадёт в свою.
+ */
+export function getColumnDraft(groupBy, columnKey) {
+  const blank = { status: '', platforms: [], assignees: [], labels: [] }
+
+  return getMoveOverrides(blank, groupBy, columnKey) || {}
+}
+
 /** PUT заменяет задачу целиком, поэтому в запрос идут все поля, а не только изменённые. */
 export function toPayload(issue, overrides = {}) {
   return {
