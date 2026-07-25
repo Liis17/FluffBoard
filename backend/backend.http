@@ -27,33 +27,37 @@ Accept: application/json
 
 ###
 
-# Status and priority are separate fields; the backend turns them into status:* and
-# priority:* labels. Send only regular labels here, and omit "priority" for no priority.
+# Status, priority and platforms are separate fields; the backend turns them into status:*,
+# priority:* and platform:* labels. Send only regular labels here, omit "priority" for no
+# priority, and note that a task may target several platforms at once.
 POST {{backend_HostAddress}}/api/board/issues
 Content-Type: application/json
 
 {
   "title": "A task created from FluffBoard",
   "body": "This issue is synchronized with GitHub.",
-  "labels": ["Backend"],
-  "assignee": "octocat",
+  "labels": ["Баг"],
+  "assignees": ["octocat"],
   "status": "todo",
-  "priority": "high"
+  "priority": "high",
+  "platforms": ["backend", "windows"]
 }
 
 ###
 
-# Moving a task to "done" closes the issue; moving it back reopens it.
+# Moving a task to "done" closes the issue; moving it back reopens it. PUT replaces the issue
+# as a whole, so every field has to be present — an omitted "platforms" clears them.
 PUT {{backend_HostAddress}}/api/board/issues/1
 Content-Type: application/json
 
 {
   "title": "A task created from FluffBoard",
   "body": "This issue is synchronized with GitHub.",
-  "labels": ["Backend"],
-  "assignee": "octocat",
+  "labels": ["Баг"],
+  "assignees": ["octocat"],
   "status": "done",
-  "priority": "high"
+  "priority": "high",
+  "platforms": ["backend", "windows"]
 }
 
 ###

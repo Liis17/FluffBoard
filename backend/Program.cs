@@ -207,7 +207,8 @@ board.MapPost("/issues", async (
                 NormalizeLabels(request.Labels),
                 NormalizeAssignees(request.Assignees),
                 NormalizeStatus(request.Status),
-                NormalizePriority(request.Priority)),
+                NormalizePriority(request.Priority),
+                NormalizePlatforms(request.Platforms)),
             cancellationToken);
         return Results.Created($"/api/board/issues/{issue.Number}", issue);
     }
@@ -242,7 +243,8 @@ board.MapPut("/issues/{number:int}", async (
                 NormalizeLabels(request.Labels),
                 NormalizeAssignees(request.Assignees),
                 NormalizeStatus(request.Status),
-                NormalizePriority(request.Priority)),
+                NormalizePriority(request.Priority),
+                NormalizePlatforms(request.Platforms)),
             cancellationToken);
         return Results.Ok(issue);
     }
@@ -289,6 +291,11 @@ static IResult? ValidateIssueRequest(IssueRequest request)
         return Results.BadRequest(new { detail = "Task priority must be urgent, high, medium, low or none." });
     }
 
+    if (!NormalizePlatforms(request.Platforms).All(GitHubClient.IsKnownPlatform))
+    {
+        return Results.BadRequest(new { detail = "Task platforms must be backend, web, windows, mac, android or iphone." });
+    }
+
     return null;
 }
 
@@ -303,6 +310,13 @@ static IReadOnlyList<string> NormalizeLabels(IReadOnlyList<string>? labels) => l
 static string NormalizeStatus(string? status) => string.IsNullOrWhiteSpace(status) ? "todo" : status.Trim();
 
 static string NormalizePriority(string? priority) => string.IsNullOrWhiteSpace(priority) ? "none" : priority.Trim();
+
+// У платформ, в отличие от статуса и приоритета, значений может быть несколько.
+static IReadOnlyList<string> NormalizePlatforms(IReadOnlyList<string>? platforms) => platforms?
+    .Select(platform => platform.Trim())
+    .Where(platform => platform.Length > 0)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToList() ?? [];
 
 static IReadOnlyList<string> NormalizeAssignees(IReadOnlyList<string>? assignees) => assignees?
     .Select(assignee => assignee.Trim())
@@ -335,4 +349,5 @@ public sealed record IssueRequest(
     IReadOnlyList<string>? Labels,
     IReadOnlyList<string>? Assignees,
     string? Status,
-    string? Priority);
+    string? Priority,
+    IReadOnlyList<string>? Platforms);

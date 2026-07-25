@@ -9,6 +9,7 @@ public sealed class GitHubClient(HttpClient httpClient)
 {
     private const string StatusPrefix = "status:";
     private const string PriorityPrefix = "priority:";
+    private const string PlatformPrefix = "platform:";
     private const string DefaultStatus = "todo";
     private const string DoneStatus = "done";
     private const string NoPriority = "none";
@@ -26,6 +27,19 @@ public sealed class GitHubClient(HttpClient httpClient)
         new("high", "Высокий", "ea580c"),
         new("medium", "Средний", "ca8a04"),
         new("low", "Низкий", "64748b")
+    ];
+
+    // Каталог платформ закрыт: в отличие от статусов, своих платформ пользователь не заводит.
+    // Порядок — от сервера к клиентам: бэкенд, веб, десктоп, мобильные. Цвета четырёх первых
+    // унаследованы от лейблов, которые в репозитории уже были до переименования.
+    private static readonly ServiceLabelEntry[] PlatformCatalog =
+    [
+        new("backend", "Бэкенд", "1d76db"),
+        new("web", "Веб", "688b0b"),
+        new("windows", "Windows", "8644f4"),
+        new("mac", "macOS", "475569"),
+        new("android", "Android", "6aa218"),
+        new("iphone", "iPhone", "0891b2")
     ];
 
     // Цвета пользовательских колонок берутся по кругу — 01-tokens.md, раздел про статусы.
@@ -119,7 +133,7 @@ public sealed class GitHubClient(HttpClient httpClient)
         IssueDraft issue,
         CancellationToken cancellationToken)
     {
-        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority);
+        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority, issue.Platforms);
         await EnsureServiceLabelsAsync(owner, repository, labels, cancellationToken);
         var response = await SendAsync<GitHubIssueResponse>(
             HttpMethod.Post,
@@ -154,7 +168,7 @@ public sealed class GitHubClient(HttpClient httpClient)
         IssueUpdate issue,
         CancellationToken cancellationToken)
     {
-        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority);
+        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority, issue.Platforms);
         await EnsureServiceLabelsAsync(owner, repository, labels, cancellationToken);
         var response = await SendAsync<GitHubIssueResponse>(
             HttpMethod.Patch,
@@ -173,10 +187,14 @@ public sealed class GitHubClient(HttpClient httpClient)
 
     public static bool IsServiceLabel(string name) =>
         name.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase) ||
-        name.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase);
+        name.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase) ||
+        name.StartsWith(PlatformPrefix, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsKnownPriority(string priority) =>
         KeysEqual(priority, NoPriority) || CatalogIndex(PriorityCatalog, priority) != int.MaxValue;
+
+    public static bool IsKnownPlatform(string platform) =>
+        CatalogIndex(PlatformCatalog, platform) != int.MaxValue;
 
     public static void Configure(HttpClient httpClient, string? token)
     {
@@ -320,8 +338,22 @@ public sealed class GitHubClient(HttpClient httpClient)
             // Задачи без лейбла статуса раскладываются по state: закрытые готовы, остальные в очереди.
             SelectServiceKey(labels, StatusPrefix, StatusCatalog)
                 ?? (string.Equals(issue.State, "closed", StringComparison.OrdinalIgnoreCase) ? DoneStatus : DefaultStatus),
-            SelectServiceKey(labels, PriorityPrefix, PriorityCatalog) ?? NoPriority);
+            SelectServiceKey(labels, PriorityPrefix, PriorityCatalog) ?? NoPriority,
+            SelectPlatforms(labels));
     }
+
+    /// <summary>
+    /// Платформа — единственное многозначное служебное измерение: задача честно может относиться
+    /// сразу к нескольким. Каталог закрыт, поэтому неизвестный ключ отбрасывается: колонки доски
+    /// строятся по каталогу, показать такую платформу негде, а следующее сохранение из UI её снимет.
+    /// </summary>
+    private static List<string> SelectPlatforms(IEnumerable<GitHubLabel> labels) =>
+        labels
+            .Where(label => label.Name.StartsWith(PlatformPrefix, StringComparison.OrdinalIgnoreCase))
+            .Select(label => label.Name[PlatformPrefix.Length..])
+            .Where(IsKnownPlatform)
+            .OrderBy(key => CatalogIndex(PlatformCatalog, key))
+            .ToList();
 
     /// <summary>
     /// Возвращает ключ служебного лейбла. Задача должна иметь не больше одного статуса и одного
@@ -340,7 +372,11 @@ public sealed class GitHubClient(HttpClient httpClient)
             .ThenBy(key => key, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
 
-    private static List<string> ComposeLabels(IReadOnlyList<string> labels, string status, string priority)
+    private static List<string> ComposeLabels(
+        IReadOnlyList<string> labels,
+        string status,
+        string priority,
+        IReadOnlyList<string> platforms)
     {
         var composed = new List<string>(labels) { StatusPrefix + status };
 
@@ -348,6 +384,8 @@ public sealed class GitHubClient(HttpClient httpClient)
         {
             composed.Add(PriorityPrefix + priority);
         }
+
+        composed.AddRange(platforms.Select(platform => PlatformPrefix + platform));
 
         return composed;
     }
@@ -358,6 +396,8 @@ public sealed class GitHubClient(HttpClient httpClient)
             FindEntry(StatusCatalog, label[StatusPrefix.Length..])?.Color,
         _ when label.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase) =>
             FindEntry(PriorityCatalog, label[PriorityPrefix.Length..])?.Color,
+        _ when label.StartsWith(PlatformPrefix, StringComparison.OrdinalIgnoreCase) =>
+            FindEntry(PlatformCatalog, label[PlatformPrefix.Length..])?.Color,
         _ => null
     };
 
@@ -417,7 +457,8 @@ public sealed record GitHubIssue(
     IReadOnlyList<GitHubLabel> Labels,
     IReadOnlyList<GitHubAssignee> Assignees,
     string Status,
-    string Priority);
+    string Priority,
+    IReadOnlyList<string> Platforms);
 
 public sealed record GitHubLabel(string Name, string Color);
 
@@ -431,7 +472,8 @@ public sealed record IssueDraft(
     IReadOnlyList<string> Labels,
     IReadOnlyList<string> Assignees,
     string Status,
-    string Priority);
+    string Priority,
+    IReadOnlyList<string> Platforms);
 
 public sealed record IssueUpdate(
     string Title,
@@ -439,7 +481,8 @@ public sealed record IssueUpdate(
     IReadOnlyList<string> Labels,
     IReadOnlyList<string> Assignees,
     string Status,
-    string Priority);
+    string Priority,
+    IReadOnlyList<string> Platforms);
 
 public sealed class GitHubApiException(HttpStatusCode statusCode, string message) : Exception(message)
 {
