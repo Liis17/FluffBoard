@@ -1,9 +1,38 @@
+/* Дизайн-токены доски. Значения — из docs/handoff_fluffboard_board/01-tokens.md;
+   имена сохранены, чтобы макет и код читались вместе. */
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #f8fafc;
-  background: #0f172a;
+  --bg: #f5f6f8;
+  --text: #16181d;
+  --muted: #6b7280;
+  --card-bg: #ffffff;
+  --chip: #eef0f3;
+  --field: #f7f8fa;
+  --border: #e4e6ea;
+  --track: #e9ebef;
+  --accent: #16181d;
+  --accent-ink: #ffffff;
+  --scrim: rgba(22, 24, 29, 0.4);
+  --danger: #dc2626;
+  --danger-bd: #f0c4c4;
+  --danger-bg: #fef2f2;
+
+  --rad: 10px;
+  --colrad: 14px;
+  --colw: 332px;
+  --colpad: 4px;
+  --cardpad: 14px;
+  --cardgap: 9px;
+  --shadow: 0 1px 3px rgba(20, 25, 40, 0.07);
+
+  --font: 'Manrope', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
@@ -14,4 +43,34 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(22, 24, 29, 0.12);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 20px;
+  background: rgba(120, 140, 170, 0.28);
 }
