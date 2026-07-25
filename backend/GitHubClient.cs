@@ -48,8 +48,8 @@ public sealed class GitHubClient(HttpClient httpClient)
         new("iphone", "iPhone", "0891b2")
     ];
 
-    // Цвета пользовательских колонок берутся по кругу — 01-tokens.md, раздел про статусы.
-    private static readonly string[] CustomStatusPalette = ["db2777", "7c3aed", "0891b2", "ca8a04", "ea580c"];
+    // Цвета создаваемых колонок и меток берутся по кругу — 01-tokens.md, раздел про статусы.
+    private static readonly string[] CustomLabelPalette = ["db2777", "7c3aed", "0891b2", "ca8a04", "ea580c"];
 
     private static readonly ConcurrentDictionary<string, byte> EnsuredLabels = new();
 
@@ -123,7 +123,7 @@ public sealed class GitHubClient(HttpClient httpClient)
         }
 
         var customCount = existing.Count(status => CatalogIndex(StatusCatalog, status.Key) == int.MaxValue);
-        var color = CustomStatusPalette[customCount % CustomStatusPalette.Length];
+        var color = CustomLabelPalette[customCount % CustomLabelPalette.Length];
         var label = await SendAsync<GitHubLabelResponse>(
             HttpMethod.Post,
             $"repos/{RepositoryPath(owner, repository)}/labels",
@@ -131,6 +131,32 @@ public sealed class GitHubClient(HttpClient httpClient)
             cancellationToken);
 
         return new BoardStatus(name, name, label.Color);
+    }
+
+    /// <summary>
+    /// Создаёт обычную метку. Цвет берётся по кругу от числа уже заведённых меток, потому что
+    /// выбрать его в интерфейсе негде, — так же устроены пользовательские колонки.
+    /// </summary>
+    public async Task<GitHubLabel> CreateLabelAsync(
+        string owner,
+        string repository,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var existing = await GetLabelsAsync(owner, repository, cancellationToken);
+        if (existing.Any(label => KeysEqual(label.Name, name)))
+        {
+            throw new GitHubApiException(HttpStatusCode.Conflict, "Метка с таким названием уже есть.");
+        }
+
+        var color = CustomLabelPalette[existing.Count(label => !IsServiceLabel(label.Name)) % CustomLabelPalette.Length];
+        var created = await SendAsync<GitHubLabelResponse>(
+            HttpMethod.Post,
+            $"repos/{RepositoryPath(owner, repository)}/labels",
+            new { name, color },
+            cancellationToken);
+
+        return new GitHubLabel(created.Name, created.Color);
     }
 
     public async Task<GitHubIssue> CreateIssueAsync(

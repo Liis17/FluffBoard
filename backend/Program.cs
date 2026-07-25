@@ -140,6 +140,35 @@ board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, 
     }
 });
 
+board.MapPost("/labels", async (
+    LabelRequest request,
+    GitHubClient gitHubClient,
+    BoardOptions options,
+    CancellationToken cancellationToken) =>
+{
+    var name = request.Name?.Trim() ?? "";
+    if (name.Length == 0 || name.Length > 50)
+    {
+        return Results.BadRequest(new { detail = "Label name must contain between 1 and 50 characters." });
+    }
+
+    // Служебный префикс превратил бы метку в статус, приоритет или платформу — их заводят не здесь.
+    if (GitHubClient.IsServiceLabel(name))
+    {
+        return Results.BadRequest(new { detail = "Label name must not start with a service prefix." });
+    }
+
+    try
+    {
+        var label = await gitHubClient.CreateLabelAsync(options.Repository.Owner, options.Repository.Name, name, cancellationToken);
+        return Results.Created($"/api/board/labels/{Uri.EscapeDataString(label.Name)}", label);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+});
+
 board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try
@@ -342,6 +371,8 @@ static IResult ToGitHubProblem(Exception exception) => exception switch
 public sealed record LoginRequest(string Username, string Password);
 
 public sealed record StatusRequest(string? Name);
+
+public sealed record LabelRequest(string? Name);
 
 public sealed record IssueRequest(
     string Title,

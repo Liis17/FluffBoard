@@ -12,7 +12,7 @@ const emptyDraft = {
   platforms: [],
 }
 
-export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate }) {
+export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate, onCreateLabel }) {
   const [draft, setDraft] = useState({ ...emptyDraft, ...prefill })
 
   function submit(event) {
@@ -56,7 +56,14 @@ export function NewTaskModal({ prefill, statuses, labels, candidates, saving, on
             />
           </label>
 
-          <TaskFields draft={draft} statuses={statuses} labels={labels} candidates={candidates} onChange={setDraft} />
+          <TaskFields
+            draft={draft}
+            statuses={statuses}
+            labels={labels}
+            candidates={candidates}
+            onChange={setDraft}
+            onCreateLabel={onCreateLabel}
+          />
         </div>
 
         <footer className="modal-foot">

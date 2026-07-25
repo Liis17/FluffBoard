@@ -1153,6 +1153,67 @@
   padding: 6px 13px 6px 7px;
 }
 
+/* Чип создания метки: пунктир отличает его от существующих меток, которые можно только выбрать. */
+.chip-add {
+  border-style: dashed;
+  padding: 6px 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chip-add:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.chip-new {
+  position: relative;
+  gap: 4px;
+  padding: 3px 5px 3px 11px;
+}
+
+.chip-new input {
+  border: none;
+  background: none;
+  width: 130px;
+  color: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.chip-new input:focus {
+  outline: none;
+}
+
+.chip-new button {
+  border: none;
+  border-radius: 50%;
+  background: var(--chip);
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.chip-new button:hover {
+  color: var(--text);
+}
+
+/* Ошибка висит под чипом, чтобы её появление не растаскивало ряд меток. */
+.chip-error {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  color: var(--danger);
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .pill-active {
   border-color: var(--accent);
   background: var(--accent);

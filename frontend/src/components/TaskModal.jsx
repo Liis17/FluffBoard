@@ -3,7 +3,7 @@ import { Modal } from './Modal.jsx'
 import { TaskFields } from './TaskFields.jsx'
 import { GitHubLink } from './atoms.jsx'
 
-export function TaskModal({ issue, statuses, labels, candidates, saving, onClose, onSave }) {
+export function TaskModal({ issue, statuses, labels, candidates, saving, onClose, onSave, onCreateLabel }) {
   // Правки живут в локальной копии и уезжают в GitHub только по «Сохранить».
   const [draft, setDraft] = useState(() => ({
     title: issue.title,
@@ -54,7 +54,14 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
             />
           </label>
 
-          <TaskFields draft={draft} statuses={statuses} labels={labels} candidates={candidates} onChange={setDraft} />
+          <TaskFields
+            draft={draft}
+            statuses={statuses}
+            labels={labels}
+            candidates={candidates}
+            onChange={setDraft}
+            onCreateLabel={onCreateLabel}
+          />
         </div>
 
         <footer className="modal-foot">

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { getLabelColors, platforms, priorities } from '../board.js'
 import { Avatar } from './atoms.jsx'
 import { Icon } from './icons.jsx'
@@ -6,8 +7,78 @@ function toggle(current, value) {
   return current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
 }
 
+/**
+ * Метка заводится прямо из задачи, для которой понадобилась, и сразу к ней прикрепляется.
+ * Формы здесь быть не может: поля задачи уже лежат внутри формы модалки, а вложенные формы
+ * запрещены — поэтому Enter обрабатывается вручную и не отправляет задачу целиком.
+ */
+function NewLabelChip({ onCreate }) {
+  const [name, setName] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function create() {
+    const value = name.trim()
+    if (value.length === 0) {
+      return
+    }
+
+    setBusy(true)
+    setError('')
+    try {
+      await onCreate(value)
+      setName(null)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function close() {
+    setName(null)
+    setError('')
+  }
+
+  if (name === null) {
+    return (
+      <button className="chip chip-add" type="button" title="Создать метку" onClick={() => setName('')}>
+        <Icon name="plus" />
+      </button>
+    )
+  }
+
+  return (
+    <span className="chip chip-new">
+      <input
+        value={name}
+        maxLength="50"
+        placeholder="Название метки"
+        aria-label="Название новой метки"
+        disabled={busy}
+        autoFocus
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            create()
+          }
+          if (event.key === 'Escape') {
+            close()
+          }
+        }}
+      />
+      <button type="button" aria-label="Создать метку" disabled={busy} onClick={create}>
+        {busy ? '…' : '✓'}
+      </button>
+      <button type="button" aria-label="Отмена" onClick={close}>×</button>
+      {error && <span className="chip-error">{error}</span>}
+    </span>
+  )
+}
+
 /** Общий набор полей для создания и редактирования: статус, приоритет, лейблы, исполнители. */
-export function TaskFields({ draft, statuses, labels, candidates, onChange }) {
+export function TaskFields({ draft, statuses, labels, candidates, onChange, onCreateLabel }) {
   const patch = (change) => onChange({ ...draft, ...change })
 
   return (
@@ -91,6 +162,12 @@ export function TaskFields({ draft, statuses, labels, candidates, onChange }) {
             )
           })}
           {labels.length === 0 && <span className="field-empty">Меток в репозитории нет.</span>}
+          <NewLabelChip
+            onCreate={async (name) => {
+              const label = await onCreateLabel(name)
+              patch({ labels: [...draft.labels, label.name] })
+            }}
+          />
         </div>
       </div>
 

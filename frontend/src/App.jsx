@@ -206,6 +206,14 @@ function App() {
     }
   }
 
+  // Ошибку не глотаем: её показывает модалка, где метку и заводят, а общий баннер она перекрывает.
+  // Порядок совпадает с тем, в котором метки приходят из GitHub, — по алфавиту без учёта регистра.
+  async function createLabel(name) {
+    const label = await api('/api/board/labels', { method: 'POST', body: JSON.stringify({ name }) })
+    setLabels((current) => [...current, label].sort((left, right) => left.name.localeCompare(right.name)))
+    return label
+  }
+
   async function addColumn(name) {
     setSaving(true)
     setError('')
@@ -305,6 +313,7 @@ function App() {
           saving={saving}
           onClose={() => setCreating(null)}
           onCreate={(task) => save(task)}
+          onCreateLabel={createLabel}
         />
       )}
 
@@ -318,6 +327,7 @@ function App() {
           saving={saving}
           onClose={() => setOpenNumber(null)}
           onSave={(task) => save(task, openIssue.number)}
+          onCreateLabel={createLabel}
         />
       )}
     </div>
