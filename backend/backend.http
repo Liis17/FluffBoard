@@ -21,9 +21,38 @@ Accept: application/json
 
 ###
 
-# Board columns: the three built-in statuses plus any custom status:* label.
+# Board columns: the six built-in statuses plus any custom status:* label.
 GET {{backend_HostAddress}}/api/board/statuses
 Accept: application/json
+
+###
+
+# Logins GitHub will accept as assignees — not the same as repository contributors.
+GET {{backend_HostAddress}}/api/board/assignees
+Accept: application/json
+
+###
+
+# Creates a regular label; a service prefix is rejected and a duplicate name gives 409.
+POST {{backend_HostAddress}}/api/board/labels
+Content-Type: application/json
+
+{
+  "name": "Инфраструктура"
+}
+
+###
+
+# Uploads an image to the board-assets branch and returns its raw link for the description.
+POST {{backend_HostAddress}}/api/board/assets
+Content-Type: multipart/form-data; boundary=FluffBoardBoundary
+
+--FluffBoardBoundary
+Content-Disposition: form-data; name="file"; filename="screenshot.png"
+Content-Type: image/png
+
+< ./screenshot.png
+--FluffBoardBoundary--
 
 ###
 
