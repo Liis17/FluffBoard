@@ -48,12 +48,18 @@ function writeView({ view, groupBy, query, filters }) {
 // Назначить можно и логин, которого нет среди участников доски: в репозитории такие уже есть.
 // Логины GitHub регистронезависимы, поэтому склейка идёт без учёта регистра, а показывается
 // написание из задач — оно совпадает с настоящим.
-function getAssigneeCandidates(issues, users) {
+function getAssigneeCandidates(issues, users, assignable) {
   const candidates = new Map()
 
   for (const issue of issues) {
     for (const assignee of issue.assignees) {
       candidates.set(assignee.login.toLowerCase(), assignee.login)
+    }
+  }
+
+  for (const login of assignable) {
+    if (!candidates.has(login.toLowerCase())) {
+      candidates.set(login.toLowerCase(), login)
     }
   }
 
@@ -72,6 +78,8 @@ function App() {
   const [statuses, setStatuses] = useState([])
   const [labels, setLabels] = useState([])
   const [users, setUsers] = useState([])
+  // Логины, которых GitHub примет исполнителями: у остальных назначение молча пропадёт.
+  const [assignable, setAssignable] = useState([])
 
   const [board, setBoard] = useState(readView)
   const [openNumber, setOpenNumber] = useState(null)
@@ -92,16 +100,18 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const [loadedIssues, loadedStatuses, loadedLabels, loadedUsers] = await Promise.all([
+      const [loadedIssues, loadedStatuses, loadedLabels, loadedUsers, loadedAssignable] = await Promise.all([
         api('/api/board/issues'),
         api('/api/board/statuses'),
         api('/api/board/labels'),
         api('/api/board/users'),
+        api('/api/board/assignees'),
       ])
       setIssues(loadedIssues)
       setStatuses(loadedStatuses)
       setLabels(loadedLabels)
       setUsers(loadedUsers)
+      setAssignable(loadedAssignable)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -129,7 +139,7 @@ function App() {
     }
   }, [user, loadBoard])
 
-  const candidates = useMemo(() => getAssigneeCandidates(issues, users), [issues, users])
+  const candidates = useMemo(() => getAssigneeCandidates(issues, users, assignable), [issues, users, assignable])
   const filtered = useMemo(() => visibleTasks(issues, board.query, board.filters), [issues, board.query, board.filters])
   const columns = useMemo(
     () => buildColumns(filtered, board.groupBy, { statuses, candidates, labels }),

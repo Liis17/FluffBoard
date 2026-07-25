@@ -140,6 +140,19 @@ board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, 
     }
 });
 
+board.MapGet("/assignees", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var logins = await gitHubClient.GetAssignableUsersAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        return Results.Ok(logins);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+});
+
 board.MapPost("/labels", async (
     LabelRequest request,
     GitHubClient gitHubClient,

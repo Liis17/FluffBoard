@@ -82,6 +82,23 @@ public sealed class GitHubClient(HttpClient httpClient)
         return labels.Select(label => new GitHubLabel(label.Name, label.Color)).ToList();
     }
 
+    /// <summary>
+    /// Логины, которых GitHub примет исполнителями. Это не то же, что контрибьюторы: назначить
+    /// можно только пользователя с доступом к репозиторию, а чужой логин GitHub молча отбросит —
+    /// задача сохранилась бы без исполнителя.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetAssignableUsersAsync(
+        string owner,
+        string repository,
+        CancellationToken cancellationToken)
+    {
+        var users = await GetAllAsync<GitHubAssigneeResponse>(
+            $"repos/{RepositoryPath(owner, repository)}/assignees?per_page=100",
+            cancellationToken);
+
+        return users.Select(user => user.Login).ToList();
+    }
+
     public async Task<IReadOnlyList<BoardStatus>> GetStatusesAsync(
         string owner,
         string repository,
