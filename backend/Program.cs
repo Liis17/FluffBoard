@@ -139,13 +139,26 @@ board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, 
     }
 });
 
+board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var statuses = await gitHubClient.GetStatusesAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        return Results.Ok(statuses);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+});
+
 board.MapPost("/issues", async (
     IssueRequest request,
     GitHubClient gitHubClient,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
-    var validationProblem = ValidateIssueRequest(request, allowClosed: false);
+    var validationProblem = ValidateIssueRequest(request);
     if (validationProblem is not null)
     {
         return validationProblem;
@@ -156,7 +169,13 @@ board.MapPost("/issues", async (
         var issue = await gitHubClient.CreateIssueAsync(
             options.Repository.Owner,
             options.Repository.Name,
-            new IssueDraft(request.Title.Trim(), request.Body?.Trim(), NormalizeLabels(request.Labels), NormalizeAssignees(request.Assignee)),
+            new IssueDraft(
+                request.Title.Trim(),
+                request.Body?.Trim(),
+                NormalizeLabels(request.Labels),
+                NormalizeAssignees(request.Assignee),
+                NormalizeStatus(request.Status),
+                NormalizePriority(request.Priority)),
             cancellationToken);
         return Results.Created($"/api/board/issues/{issue.Number}", issue);
     }
@@ -173,7 +192,7 @@ board.MapPut("/issues/{number:int}", async (
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
-    var validationProblem = ValidateIssueRequest(request, allowClosed: true);
+    var validationProblem = ValidateIssueRequest(request);
     if (validationProblem is not null)
     {
         return validationProblem;
@@ -190,7 +209,8 @@ board.MapPut("/issues/{number:int}", async (
                 request.Body?.Trim(),
                 NormalizeLabels(request.Labels),
                 NormalizeAssignees(request.Assignee),
-                request.State!),
+                NormalizeStatus(request.Status),
+                NormalizePriority(request.Priority)),
             cancellationToken);
         return Results.Ok(issue);
     }
@@ -220,7 +240,7 @@ static int? GetUserId(ClaimsPrincipal principal) =>
 
 static BoardUserProfile ToProfile(BoardUser user) => new(user.Id, user.Username, user.GitHubLogin);
 
-static IResult? ValidateIssueRequest(IssueRequest request, bool allowClosed)
+static IResult? ValidateIssueRequest(IssueRequest request)
 {
     if (string.IsNullOrWhiteSpace(request.Title))
     {
@@ -232,19 +252,25 @@ static IResult? ValidateIssueRequest(IssueRequest request, bool allowClosed)
         return Results.BadRequest(new { detail = "Task title must contain at most 256 characters." });
     }
 
-    if (allowClosed && request.State is not ("open" or "closed"))
+    if (!GitHubClient.IsKnownPriority(NormalizePriority(request.Priority)))
     {
-        return Results.BadRequest(new { detail = "Task state must be open or closed." });
+        return Results.BadRequest(new { detail = "Task priority must be urgent, high, medium, low or none." });
     }
 
     return null;
 }
 
+// Служебные лейблы собирает GitHubClient из Status и Priority, поэтому присланные клиентом
+// status:* и priority:* отбрасываются — иначе они попали бы в задачу дважды.
 static IReadOnlyList<string> NormalizeLabels(IReadOnlyList<string>? labels) => labels?
     .Select(label => label.Trim())
-    .Where(label => label.Length > 0)
+    .Where(label => label.Length > 0 && !GitHubClient.IsServiceLabel(label))
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToList() ?? [];
+
+static string NormalizeStatus(string? status) => string.IsNullOrWhiteSpace(status) ? "todo" : status.Trim();
+
+static string NormalizePriority(string? priority) => string.IsNullOrWhiteSpace(priority) ? "none" : priority.Trim();
 
 static IReadOnlyList<string> NormalizeAssignees(string? assignee) =>
     string.IsNullOrWhiteSpace(assignee) ? [] : [assignee.Trim()];
@@ -266,4 +292,10 @@ static IResult ToGitHubProblem(Exception exception) => exception switch
 
 public sealed record LoginRequest(string Username, string Password);
 
-public sealed record IssueRequest(string Title, string? Body, IReadOnlyList<string>? Labels, string? Assignee, string? State);
+public sealed record IssueRequest(
+    string Title,
+    string? Body,
+    IReadOnlyList<string>? Labels,
+    string? Assignee,
+    string? Status,
+    string? Priority);

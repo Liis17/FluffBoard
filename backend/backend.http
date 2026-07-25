@@ -21,14 +21,39 @@ Accept: application/json
 
 ###
 
+# Board columns: the three built-in statuses plus any custom status:* label.
+GET {{backend_HostAddress}}/api/board/statuses
+Accept: application/json
+
+###
+
+# Status and priority are separate fields; the backend turns them into status:* and
+# priority:* labels. Send only regular labels here, and omit "priority" for no priority.
 POST {{backend_HostAddress}}/api/board/issues
 Content-Type: application/json
 
 {
   "title": "A task created from FluffBoard",
   "body": "This issue is synchronized with GitHub.",
-  "labels": ["todo"],
-  "assignee": "octocat"
+  "labels": ["Backend"],
+  "assignee": "octocat",
+  "status": "todo",
+  "priority": "high"
+}
+
+###
+
+# Moving a task to "done" closes the issue; moving it back reopens it.
+PUT {{backend_HostAddress}}/api/board/issues/1
+Content-Type: application/json
+
+{
+  "title": "A task created from FluffBoard",
+  "body": "This issue is synchronized with GitHub.",
+  "labels": ["Backend"],
+  "assignee": "octocat",
+  "status": "done",
+  "priority": "high"
 }
 
 ###

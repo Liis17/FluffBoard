@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -6,6 +7,29 @@ using System.Text.Json.Serialization;
 
 public sealed class GitHubClient(HttpClient httpClient)
 {
+    private const string StatusPrefix = "status:";
+    private const string PriorityPrefix = "priority:";
+    private const string DefaultStatus = "todo";
+    private const string DoneStatus = "done";
+    private const string NoPriority = "none";
+
+    private static readonly ServiceLabelEntry[] StatusCatalog =
+    [
+        new(DefaultStatus, "К выполнению", "f59e0b"),
+        new("in-progress", "В работе", "2563eb"),
+        new(DoneStatus, "Готово", "16a34a")
+    ];
+
+    private static readonly ServiceLabelEntry[] PriorityCatalog =
+    [
+        new("urgent", "Срочно", "dc2626"),
+        new("high", "Высокий", "ea580c"),
+        new("medium", "Средний", "ca8a04"),
+        new("low", "Низкий", "64748b")
+    ];
+
+    private static readonly ConcurrentDictionary<string, byte> EnsuredLabels = new();
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<IReadOnlyList<GitHubIssue>> GetIssuesAsync(
@@ -35,13 +59,42 @@ public sealed class GitHubClient(HttpClient httpClient)
         return labels.Select(label => new GitHubLabel(label.Name, label.Color)).ToList();
     }
 
+    public async Task<IReadOnlyList<BoardStatus>> GetStatusesAsync(
+        string owner,
+        string repository,
+        CancellationToken cancellationToken)
+    {
+        var statusLabels = (await GetLabelsAsync(owner, repository, cancellationToken))
+            .Where(label => label.Name.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase))
+            .Select(label => new { Key = label.Name[StatusPrefix.Length..], label.Color })
+            .Where(status => status.Key.Length > 0)
+            .ToList();
+
+        // Встроенные статусы возвращаются всегда, даже если лейблов в репозитории ещё нет,
+        // иначе свежий репозиторий остался бы без колонок.
+        var statuses = StatusCatalog
+            .Select(entry => new BoardStatus(
+                entry.Key,
+                entry.Name,
+                statusLabels.FirstOrDefault(status => KeysEqual(status.Key, entry.Key))?.Color ?? entry.Color))
+            .ToList();
+
+        statuses.AddRange(statusLabels
+            .Where(status => CatalogIndex(StatusCatalog, status.Key) == int.MaxValue)
+            .OrderBy(status => status.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(status => new BoardStatus(status.Key, status.Key, status.Color)));
+
+        return statuses;
+    }
+
     public async Task<GitHubIssue> CreateIssueAsync(
         string owner,
         string repository,
         IssueDraft issue,
         CancellationToken cancellationToken)
     {
-        await EnsureWorkflowLabelsAsync(owner, repository, issue.Labels, cancellationToken);
+        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority);
+        await EnsureServiceLabelsAsync(owner, repository, labels, cancellationToken);
         var response = await SendAsync<GitHubIssueResponse>(
             HttpMethod.Post,
             $"repos/{RepositoryPath(owner, repository)}/issues",
@@ -49,10 +102,22 @@ public sealed class GitHubClient(HttpClient httpClient)
             {
                 title = issue.Title,
                 body = issue.Body,
-                labels = issue.Labels,
+                labels,
                 assignees = issue.Assignees
             },
             cancellationToken);
+
+        // Создать issue сразу закрытым GitHub не позволяет, поэтому задачу в статусе
+        // «Готово» закрываем вторым запросом — иначе статус и state разойдутся.
+        if (KeysEqual(issue.Status, DoneStatus))
+        {
+            response = await SendAsync<GitHubIssueResponse>(
+                HttpMethod.Patch,
+                $"repos/{RepositoryPath(owner, repository)}/issues/{response.Number}",
+                new { state = "closed" },
+                cancellationToken);
+        }
+
         return ToIssue(response);
     }
 
@@ -63,7 +128,8 @@ public sealed class GitHubClient(HttpClient httpClient)
         IssueUpdate issue,
         CancellationToken cancellationToken)
     {
-        await EnsureWorkflowLabelsAsync(owner, repository, issue.Labels, cancellationToken);
+        var labels = ComposeLabels(issue.Labels, issue.Status, issue.Priority);
+        await EnsureServiceLabelsAsync(owner, repository, labels, cancellationToken);
         var response = await SendAsync<GitHubIssueResponse>(
             HttpMethod.Patch,
             $"repos/{RepositoryPath(owner, repository)}/issues/{number}",
@@ -71,13 +137,20 @@ public sealed class GitHubClient(HttpClient httpClient)
             {
                 title = issue.Title,
                 body = issue.Body,
-                labels = issue.Labels,
+                labels,
                 assignees = issue.Assignees,
-                state = issue.State
+                state = KeysEqual(issue.Status, DoneStatus) ? "closed" : "open"
             },
             cancellationToken);
         return ToIssue(response);
     }
+
+    public static bool IsServiceLabel(string name) =>
+        name.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase) ||
+        name.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsKnownPriority(string priority) =>
+        KeysEqual(priority, NoPriority) || CatalogIndex(PriorityCatalog, priority) != int.MaxValue;
 
     public static void Configure(HttpClient httpClient, string? token)
     {
@@ -92,36 +165,52 @@ public sealed class GitHubClient(HttpClient httpClient)
         }
     }
 
-    private async Task EnsureWorkflowLabelsAsync(
+    /// <summary>
+    /// Создаёт отсутствующие служебные лейблы с каноническим цветом. Статус присутствует в каждой
+    /// записи, поэтому вычитывать весь список лейблов репозитория нельзя — вместо этого лейбл
+    /// создаётся сразу, а <c>422 already_exists</c> означает, что он уже на месте. Успешно
+    /// проверенные лейблы кешируются на время жизни процесса: клиент транзиентный, кеш статический.
+    /// </summary>
+    private async Task EnsureServiceLabelsAsync(
         string owner,
         string repository,
-        IReadOnlyList<string> requestedLabels,
+        IEnumerable<string> labels,
         CancellationToken cancellationToken)
     {
-        var workflowLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        foreach (var label in labels.Where(IsServiceLabel))
         {
-            ["todo"] = "bfdbfe",
-            ["in-progress"] = "fbca04",
-            ["done"] = "0e8a16"
-        };
-        var requiredLabels = requestedLabels
-            .Where(workflowLabels.ContainsKey)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            var color = ServiceLabelColor(label);
+            var cacheKey = $"{owner}/{repository}/{label}";
 
-        if (requiredLabels.Count == 0)
-        {
-            return;
-        }
+            // Цвет пользовательского статуса пока задать негде, поэтому его создание
+            // оставляем GitHub — он назначит лейблу случайный цвет.
+            if (color is null || EnsuredLabels.ContainsKey(cacheKey))
+            {
+                continue;
+            }
 
-        var existingLabels = await GetLabelsAsync(owner, repository, cancellationToken);
-        foreach (var label in requiredLabels.Where(label => existingLabels.All(existing => !string.Equals(existing.Name, label, StringComparison.OrdinalIgnoreCase))))
-        {
-            await SendAsync<GitHubLabelResponse>(
-                HttpMethod.Post,
-                $"repos/{RepositoryPath(owner, repository)}/labels",
-                new { name = label, color = workflowLabels[label] },
-                cancellationToken);
+            try
+            {
+                await SendAsync<GitHubLabelResponse>(
+                    HttpMethod.Post,
+                    $"repos/{RepositoryPath(owner, repository)}/labels",
+                    new { name = label, color },
+                    cancellationToken);
+            }
+            catch (GitHubApiException exception) when (exception.StatusCode == HttpStatusCode.UnprocessableEntity)
+            {
+                // Лейбл уже создан — ровно то состояние, которое нужно.
+            }
+            catch (GitHubApiException)
+            {
+                // Канонический цвет — косметика, поэтому её неудача не должна ронять запись задачи:
+                // GitHub сам создаст лейбл со случайным цветом при применении. Настоящие проблемы
+                // (например нехватка прав у токена) всплывут на записи самой задачи. Кеш не трогаем —
+                // существование лейбла не подтверждено.
+                continue;
+            }
+
+            EnsuredLabels[cacheKey] = 0;
         }
     }
 
@@ -190,14 +279,73 @@ public sealed class GitHubClient(HttpClient httpClient)
         return null;
     }
 
-    private static GitHubIssue ToIssue(GitHubIssueResponse issue) => new(
-        issue.Number,
-        issue.Title,
-        issue.Body ?? "",
-        issue.State,
-        issue.HtmlUrl,
-        issue.Labels.Select(label => new GitHubLabel(label.Name, label.Color)).ToList(),
-        issue.Assignees.Select(assignee => new GitHubAssignee(assignee.Login, assignee.AvatarUrl)).ToList());
+    private static GitHubIssue ToIssue(GitHubIssueResponse issue)
+    {
+        var labels = issue.Labels.Select(label => new GitHubLabel(label.Name, label.Color)).ToList();
+
+        return new GitHubIssue(
+            issue.Number,
+            issue.Title,
+            issue.Body ?? "",
+            issue.State,
+            issue.HtmlUrl,
+            labels.Where(label => !IsServiceLabel(label.Name)).ToList(),
+            issue.Assignees.Select(assignee => new GitHubAssignee(assignee.Login, assignee.AvatarUrl)).ToList(),
+            // Задачи без лейбла статуса раскладываются по state: закрытые готовы, остальные в очереди.
+            SelectServiceKey(labels, StatusPrefix, StatusCatalog)
+                ?? (string.Equals(issue.State, "closed", StringComparison.OrdinalIgnoreCase) ? DoneStatus : DefaultStatus),
+            SelectServiceKey(labels, PriorityPrefix, PriorityCatalog) ?? NoPriority);
+    }
+
+    /// <summary>
+    /// Возвращает ключ служебного лейбла. Задача должна иметь не больше одного статуса и одного
+    /// приоритета; если лейблов навесили вручную больше, побеждает первый по каноническому порядку —
+    /// для приоритета это самый высокий уровень.
+    /// </summary>
+    private static string? SelectServiceKey(
+        IEnumerable<GitHubLabel> labels,
+        string prefix,
+        ServiceLabelEntry[] catalog) =>
+        labels
+            .Where(label => label.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(label => label.Name[prefix.Length..])
+            .Where(key => key.Length > 0)
+            .OrderBy(key => CatalogIndex(catalog, key))
+            .ThenBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+
+    private static List<string> ComposeLabels(IReadOnlyList<string> labels, string status, string priority)
+    {
+        var composed = new List<string>(labels) { StatusPrefix + status };
+
+        if (!KeysEqual(priority, NoPriority))
+        {
+            composed.Add(PriorityPrefix + priority);
+        }
+
+        return composed;
+    }
+
+    private static string? ServiceLabelColor(string label) => label switch
+    {
+        _ when label.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase) =>
+            FindEntry(StatusCatalog, label[StatusPrefix.Length..])?.Color,
+        _ when label.StartsWith(PriorityPrefix, StringComparison.OrdinalIgnoreCase) =>
+            FindEntry(PriorityCatalog, label[PriorityPrefix.Length..])?.Color,
+        _ => null
+    };
+
+    private static ServiceLabelEntry? FindEntry(ServiceLabelEntry[] catalog, string key) =>
+        catalog.FirstOrDefault(entry => KeysEqual(entry.Key, key));
+
+    private static int CatalogIndex(ServiceLabelEntry[] catalog, string key)
+    {
+        var index = Array.FindIndex(catalog, entry => KeysEqual(entry.Key, key));
+        return index < 0 ? int.MaxValue : index;
+    }
+
+    private static bool KeysEqual(string left, string right) =>
+        string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     private static string RepositoryPath(string owner, string repository) =>
         $"{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repository)}";
@@ -230,6 +378,8 @@ public sealed class GitHubClient(HttpClient httpClient)
         [property: JsonPropertyName("avatar_url")] string AvatarUrl);
 
     private sealed record GitHubErrorResponse(string? Message);
+
+    private sealed record ServiceLabelEntry(string Key, string Name, string Color);
 }
 
 public sealed record GitHubIssue(
@@ -239,15 +389,31 @@ public sealed record GitHubIssue(
     string State,
     string HtmlUrl,
     IReadOnlyList<GitHubLabel> Labels,
-    IReadOnlyList<GitHubAssignee> Assignees);
+    IReadOnlyList<GitHubAssignee> Assignees,
+    string Status,
+    string Priority);
 
 public sealed record GitHubLabel(string Name, string Color);
 
 public sealed record GitHubAssignee(string Login, string AvatarUrl);
 
-public sealed record IssueDraft(string Title, string? Body, IReadOnlyList<string> Labels, IReadOnlyList<string> Assignees);
+public sealed record BoardStatus(string Key, string Name, string Color);
 
-public sealed record IssueUpdate(string Title, string? Body, IReadOnlyList<string> Labels, IReadOnlyList<string> Assignees, string State);
+public sealed record IssueDraft(
+    string Title,
+    string? Body,
+    IReadOnlyList<string> Labels,
+    IReadOnlyList<string> Assignees,
+    string Status,
+    string Priority);
+
+public sealed record IssueUpdate(
+    string Title,
+    string? Body,
+    IReadOnlyList<string> Labels,
+    IReadOnlyList<string> Assignees,
+    string Status,
+    string Priority);
 
 public sealed class GitHubApiException(HttpStatusCode statusCode, string message) : Exception(message)
 {
