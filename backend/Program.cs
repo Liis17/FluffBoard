@@ -131,7 +131,8 @@ board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, 
     try
     {
         var labels = await gitHubClient.GetLabelsAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
-        return Results.Ok(labels);
+        // Служебные лейблы редактируются статусом и приоритетом, в выборе обычных меток им не место.
+        return Results.Ok(labels.Where(label => !GitHubClient.IsServiceLabel(label.Name)));
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
     {

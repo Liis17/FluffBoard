@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 
-const workflow = [
-  { id: 'todo', title: 'К выполнению' },
-  { id: 'in-progress', title: 'В работе' },
-  { id: 'done', title: 'Готово' },
+// Порядок и цвета — из docs/handoff_fluffboard_board/01-tokens.md.
+const priorities = [
+  { id: 'urgent', title: 'Срочно', color: '#dc2626' },
+  { id: 'high', title: 'Высокий', color: '#ea580c' },
+  { id: 'medium', title: 'Средний', color: '#ca8a04' },
+  { id: 'low', title: 'Низкий', color: '#64748b' },
+  { id: 'none', title: 'Без приоритета', color: '#94a3b8' },
 ]
 
-const workflowLabels = new Set(workflow.map((column) => column.id))
+function getPriority(id) {
+  return priorities.find((priority) => priority.id === id) || priorities.at(-1)
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -28,25 +33,12 @@ async function api(path, options = {}) {
   return data
 }
 
-function getWorkflowStatus(issue) {
-  if (issue.state === 'closed' || issue.labels.some((label) => label.name.toLowerCase() === 'done')) {
-    return 'done'
-  }
-
-  if (issue.labels.some((label) => label.name.toLowerCase() === 'in-progress')) {
-    return 'in-progress'
-  }
-
-  return 'todo'
-}
-
-function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
+function TaskEditor({ issue, statuses, labels, users, onCancel, onSave, saving }) {
   const [title, setTitle] = useState(issue?.title || '')
   const [body, setBody] = useState(issue?.body || '')
-  const [status, setStatus] = useState(issue ? getWorkflowStatus(issue) : 'todo')
-  const [selectedLabels, setSelectedLabels] = useState(
-    () => issue?.labels.map((label) => label.name).filter((label) => !workflowLabels.has(label.toLowerCase())) || [],
-  )
+  const [status, setStatus] = useState(issue?.status || 'todo')
+  const [priority, setPriority] = useState(issue?.priority || 'medium')
+  const [selectedLabels, setSelectedLabels] = useState(() => issue?.labels.map((label) => label.name) || [])
   const [assignee, setAssignee] = useState(issue?.assignees[0]?.login || '')
 
   function toggleLabel(labelName) {
@@ -62,9 +54,10 @@ function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
     onSave({
       title,
       body,
-      labels: [...selectedLabels, status],
+      labels: selectedLabels,
       assignee: assignee || null,
-      state: issue?.state === 'closed' && status === 'done' ? 'closed' : 'open',
+      status,
+      priority,
     })
   }
 
@@ -90,7 +83,13 @@ function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
         <label>
           Статус
           <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            {workflow.map((column) => <option value={column.id} key={column.id}>{column.title}</option>)}
+            {statuses.map((column) => <option value={column.key} key={column.key}>{column.name}</option>)}
+          </select>
+        </label>
+        <label>
+          Приоритет
+          <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+            {priorities.map((level) => <option value={level.id} key={level.id}>{level.title}</option>)}
           </select>
         </label>
         <label>
@@ -110,7 +109,7 @@ function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
         <fieldset>
           <legend>Метки GitHub</legend>
           <div className="label-picker">
-            {labels.filter((label) => !workflowLabels.has(label.name.toLowerCase())).map((label) => (
+            {labels.map((label) => (
               <label className="label-option" key={label.name}>
                 <input
                   type="checkbox"
@@ -121,9 +120,7 @@ function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
                 {label.name}
               </label>
             ))}
-            {labels.filter((label) => !workflowLabels.has(label.name.toLowerCase())).length === 0 && (
-              <span className="empty">Других меток в репозитории нет.</span>
-            )}
+            {labels.length === 0 && <span className="empty">Меток в репозитории нет.</span>}
           </div>
         </fieldset>
         <div className="editor-actions">
@@ -137,15 +134,16 @@ function TaskEditor({ issue, labels, users, onCancel, onSave, saving }) {
 
 function TaskCard({ issue, onEdit }) {
   const assignees = issue.assignees.length > 0 ? issue.assignees.map((assignee) => assignee.login).join(', ') : 'Не назначен'
+  const priority = getPriority(issue.priority)
 
   return (
-    <article className="task-card">
+    <article className="task-card" style={{ borderLeft: `3px solid ${priority.color}` }}>
       <button className="task-card-button" type="button" onClick={() => onEdit(issue)}>
         <span className="task-number">#{issue.number}</span>
         <strong>{issue.title}</strong>
-        {issue.labels.filter((label) => !workflowLabels.has(label.name.toLowerCase())).length > 0 && (
+        {issue.labels.length > 0 && (
           <span className="task-labels">
-            {issue.labels.filter((label) => !workflowLabels.has(label.name.toLowerCase())).map((label) => (
+            {issue.labels.map((label) => (
               <span className="task-label" key={label.name} style={{ backgroundColor: `#${label.color}` }}>{label.name}</span>
             ))}
           </span>
@@ -190,6 +188,7 @@ function LoginScreen({ onLogin, error, loading }) {
 function App() {
   const [user, setUser] = useState(null)
   const [issues, setIssues] = useState([])
+  const [statuses, setStatuses] = useState([])
   const [labels, setLabels] = useState([])
   const [users, setUsers] = useState([])
   const [editorIssue, setEditorIssue] = useState(undefined)
@@ -201,12 +200,14 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const [loadedIssues, loadedLabels, loadedUsers] = await Promise.all([
+      const [loadedIssues, loadedStatuses, loadedLabels, loadedUsers] = await Promise.all([
         api('/api/board/issues'),
+        api('/api/board/statuses'),
         api('/api/board/labels'),
         api('/api/board/users'),
       ])
       setIssues(loadedIssues)
+      setStatuses(loadedStatuses)
       setLabels(loadedLabels)
       setUsers(loadedUsers)
     } catch (requestError) {
@@ -256,6 +257,7 @@ function App() {
     await api('/api/auth/logout', { method: 'POST' })
     setUser(null)
     setIssues([])
+    setStatuses([])
     setEditorIssue(undefined)
     setError('')
   }
@@ -305,12 +307,12 @@ function App() {
         <p className="message">Загружаем актуальные задачи из GitHub…</p>
       ) : (
         <section className="kanban" aria-label="Доска задач">
-          {workflow.map((column) => {
-            const columnIssues = issues.filter((issue) => getWorkflowStatus(issue) === column.id)
+          {statuses.map((column) => {
+            const columnIssues = issues.filter((issue) => issue.status === column.key)
             return (
-              <section className="kanban-column" key={column.id}>
+              <section className="kanban-column" key={column.key}>
                 <header>
-                  <h2>{column.title}</h2>
+                  <h2>{column.name}</h2>
                   <span>{columnIssues.length}</span>
                 </header>
                 <div className="task-stack">
@@ -326,6 +328,7 @@ function App() {
       {editorIssue !== undefined && (
         <TaskEditor
           issue={editorIssue}
+          statuses={statuses}
           labels={labels}
           users={users}
           onCancel={() => setEditorIssue(undefined)}
