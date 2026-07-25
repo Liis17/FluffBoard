@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MarkdownEditor } from './MarkdownEditor.jsx'
 import { Modal } from './Modal.jsx'
 import { TaskFields } from './TaskFields.jsx'
 import { GitHubLink } from './atoms.jsx'
@@ -43,16 +44,14 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
             onChange={(event) => setDraft({ ...draft, title: event.target.value })}
           />
 
-          <label className="field-group">
+          <div className="field-group">
             <span className="field-label">Описание</span>
-            <textarea
-              className="field-input"
-              rows="4"
+            <MarkdownEditor
               value={draft.body}
               placeholder="Добавьте описание…"
-              onChange={(event) => setDraft({ ...draft, body: event.target.value })}
+              onChange={(body) => setDraft({ ...draft, body })}
             />
-          </label>
+          </div>
 
           <TaskFields
             draft={draft}

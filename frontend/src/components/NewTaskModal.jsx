@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MarkdownEditor } from './MarkdownEditor.jsx'
 import { Modal } from './Modal.jsx'
 import { TaskFields } from './TaskFields.jsx'
 
@@ -45,16 +46,15 @@ export function NewTaskModal({ prefill, statuses, labels, candidates, saving, on
             />
           </label>
 
-          <label className="field-group">
+          <div className="field-group">
             <span className="field-label">Описание</span>
-            <textarea
-              className="field-input"
-              rows="3"
+            <MarkdownEditor
               value={draft.body}
+              rows={3}
               placeholder="Контекст, шаги воспроизведения, ссылки…"
-              onChange={(event) => setDraft({ ...draft, body: event.target.value })}
+              onChange={(body) => setDraft({ ...draft, body })}
             />
-          </label>
+          </div>
 
           <TaskFields
             draft={draft}

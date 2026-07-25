@@ -1079,6 +1079,144 @@
   font-size: 12px;
 }
 
+/* Панель разметки и предпросмотр стоят над полем, как в GitHub. */
+.markdown-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.markdown-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.markdown-toolbar .icon-button {
+  width: 30px;
+  height: 30px;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.markdown-toolbar .icon-button:hover:not(:disabled) {
+  background: var(--chip);
+  color: var(--text);
+}
+
+.markdown-toolbar .icon-button:disabled {
+  opacity: 0.4;
+}
+
+/* Вкладка отжата вправо: она переключает режим, а не вставляет разметку. */
+.markdown-tab {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  padding: 6px 12px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.markdown-tab-active,
+.markdown-tab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Предпросмотр занимает место поля, поэтому у него та же рамка и минимальная высота. */
+.markdown-body {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--field);
+  padding: 12px 14px;
+  min-height: 92px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.markdown-empty {
+  color: var(--muted);
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body pre,
+.markdown-body blockquote,
+.markdown-body table {
+  margin: 0 0 10px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 20px;
+}
+
+.markdown-body code {
+  border-radius: 5px;
+  background: var(--chip);
+  padding: 1px 5px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.markdown-body pre {
+  border-radius: 9px;
+  background: var(--chip);
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--muted);
+}
+
+.markdown-body img {
+  border-radius: 9px;
+  max-width: 100%;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  text-align: left;
+}
+
 .field-input {
   width: 100%;
   border: 1px solid var(--border);
