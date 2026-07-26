@@ -216,6 +216,9 @@ function App() {
     }
   }
 
+  // Комментарии нужны только открытой задаче, поэтому их держит модалка, а не доска.
+  const loadComments = useCallback((number) => api(`/api/board/issues/${number}/comments`), [])
+
   // Файл уходит как есть, без JSON: base64 раздул бы его на треть.
   async function uploadAsset(file) {
     const body = new FormData()
@@ -347,6 +350,7 @@ function App() {
           onSave={(task) => save(task, openIssue.number)}
           onCreateLabel={createLabel}
           onUpload={uploadAsset}
+          onLoadComments={loadComments}
         />
       )}
     </div>
