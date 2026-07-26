@@ -494,9 +494,11 @@
 .board {
   display: flex;
   align-items: flex-start;
+  width: calc(100vw - 60px);
   gap: 16px;
   overflow-x: auto;
   margin-top: 22px;
+  margin-left: min(0px, calc((1500px - 100vw) / 2));
   padding-bottom: 14px;
 }
 
