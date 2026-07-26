@@ -30,3 +30,16 @@ dotnet run --project backend -- --mac
 ```
 
 Значения из корневого `.env` имеют приоритет. Для отсутствующих в нём настроек backend использует переменные окружения процесса, например переданные контейнером.
+
+## Развёртывание на сервере
+
+Доска уезжает одним Docker-образом: собранный клиент лежит в `wwwroot` рядом с backend, поэтому отдельный веб-сервер для статики не нужен.
+
+```bash
+cd docker/fluffboard
+cp sample.env .env   # порт, токен GitHub, репозиторий, пользователи доски
+docker login docker.barkfluff.com:5000
+docker compose up -d
+```
+
+Если своего nginx на сервере нет — `docker compose --profile nginx up -d`; site-конфигурация лежит в `docker/nginx/fluffboard.conf`. Образ собирает GitHub Actions на self-hosted раннере при push в `main`. Подробности — в `Obsidian/FluffBoardVault/Развёртывание.md`.

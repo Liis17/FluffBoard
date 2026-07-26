@@ -431,3 +431,6 @@ FodyWeavers.xsd
 Obsidian/.DS_Store
 .DS_Store
 .env
+
+# Шаблоны окружения для docker/: значений в них нет, а правило *.env выше их скрывало.
+!docker/**/sample.env

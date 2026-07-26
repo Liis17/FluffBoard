@@ -1,0 +1,46 @@
+services:
+  fluffboard:
+    image: docker.barkfluff.com:5000/fluffboard:latest
+    container_name: fluffboard
+    restart: always
+    # 8080 — порт образа aspnet; наружу публикуется FLUFFBOARD_PORT.
+    ports:
+      - "${FLUFFBOARD_PORT}:8080"
+    # Настройки приходят переменными окружения: backend читает их напрямую, поэтому файл .env
+    # внутрь контейнера монтировать не нужно.
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # База в томе, а не в образе: иначе пользователи доски пересоздавались бы при каждом обновлении.
+      Board__DatabasePath: /app/data/fluffboard.db
+    networks:
+      - fluffboard-network
+    volumes:
+      - fluffboard_data:/app/data
+
+  # Включать, только если на сервере нет своего nginx на 80/443:
+  #   docker compose --profile nginx up -d
+  # Сертификаты положить в ./certs, конфигурация лежит в ../nginx — см. ../nginx/fluffboard.conf.
+  nginx:
+    image: nginx:alpine
+    container_name: fluffboard-nginx
+    profiles: [ "nginx" ]
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - fluffboard-network
+    depends_on:
+      - fluffboard
+
+networks:
+  fluffboard-network:
+    driver: bridge
+
+volumes:
+  fluffboard_data:
