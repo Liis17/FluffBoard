@@ -46,10 +46,9 @@ export function PlatformChip({ id }) {
   )
 }
 
-// Аватар берётся по логину: `github.com/<login>.png` редиректит на CDN, поэтому подходит
-// и там, где на руках только логин (выбор исполнителя, оптимистичный перенос). Пока картинка
-// не загрузилась или её нет — под ней остаётся буква логина на цветном круге.
-export function Avatar({ login, size = 24 }) {
+// GitHub уже возвращает прямую CDN-ссылку в задаче, поэтому не создаём отдельный редирект на
+// каждый аватар. Для оптимистичной карточки ссылки ещё нет — остаётся буквенный fallback.
+export function Avatar({ login, avatarUrl, size = 24 }) {
   const [broken, setBroken] = useState(false)
 
   return (
@@ -59,9 +58,9 @@ export function Avatar({ login, size = 24 }) {
       title={login}
     >
       {login.slice(0, 1).toUpperCase()}
-      {!broken && (
+      {!broken && avatarUrl && (
         <img
-          src={`https://github.com/${login}.png?size=${size * 2}`}
+          src={avatarUrl}
           alt=""
           loading="lazy"
           onError={() => setBroken(true)}
@@ -78,7 +77,7 @@ export function AvatarStack({ assignees }) {
 
   return (
     <span className="avatar-stack">
-      {assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} />)}
+      {assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} avatarUrl={assignee.avatarUrl} />)}
       <span className="assignee-names">{assignees.map((assignee) => assignee.login).join(', ')}</span>
     </span>
   )

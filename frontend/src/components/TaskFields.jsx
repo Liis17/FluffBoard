@@ -78,7 +78,7 @@ function NewLabelChip({ onCreate }) {
 }
 
 /** Общий набор полей для создания и редактирования: статус, приоритет, лейблы, исполнители. */
-export function TaskFields({ draft, statuses, labels, candidates, onChange, onCreateLabel }) {
+export function TaskFields({ draft, statuses, labels, candidates, avatarUrls = new Map(), onChange, onCreateLabel }) {
   const patch = (change) => onChange({ ...draft, ...change })
 
   return (
@@ -184,7 +184,7 @@ export function TaskFields({ draft, statuses, labels, candidates, onChange, onCr
                 className={active ? 'chip chip-avatar chip-active' : 'chip chip-avatar'}
                 onClick={() => patch({ assignees: toggle(draft.assignees, login) })}
               >
-                <Avatar login={login} size={18} />
+                <Avatar login={login} avatarUrl={avatarUrls.get(login.toLowerCase())} size={18} />
                 {login}
               </button>
             )

@@ -20,7 +20,7 @@ export function TaskComments({ comments, error }) {
           {comments.map((comment) => (
             <article className="comment" key={comment.id}>
               <header className="comment-head">
-                <Avatar login={comment.author.login} size={22} />
+                <Avatar login={comment.author.login} avatarUrl={comment.author.avatarUrl} size={22} />
                 <span className="comment-author">{comment.author.login}</span>
                 <time className="comment-date" dateTime={comment.createdAt}>
                   {when.format(new Date(comment.createdAt))}

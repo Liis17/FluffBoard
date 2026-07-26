@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { api } from './api.js'
+import { clearBoardCache, readBoardCache, writeBoardCache } from './boardCache.js'
 import {
   applyOverrides,
   buildColumns,
@@ -8,6 +9,7 @@ import {
   getMetrics,
   getMoveOverrides,
   getProgress,
+  mergeBoardIssues,
   toPayload,
   visibleTasks,
 } from './board.js'
@@ -57,7 +59,7 @@ function getAssigneeCandidates(issues, users, assignable) {
     }
   }
 
-  for (const login of assignable) {
+  for (const { login } of assignable) {
     if (!candidates.has(login.toLowerCase())) {
       candidates.set(login.toLowerCase(), login)
     }
@@ -72,6 +74,22 @@ function getAssigneeCandidates(issues, users, assignable) {
   return [...candidates.values()].sort((left, right) => left.localeCompare(right))
 }
 
+function getAvatarUrls(issues, assignable) {
+  const avatarUrls = new Map()
+
+  for (const issue of issues) {
+    for (const assignee of issue.assignees) {
+      if (assignee.avatarUrl) avatarUrls.set(assignee.login.toLowerCase(), assignee.avatarUrl)
+    }
+  }
+
+  for (const assignee of assignable) {
+    if (assignee.avatarUrl) avatarUrls.set(assignee.login.toLowerCase(), assignee.avatarUrl)
+  }
+
+  return avatarUrls
+}
+
 function App() {
   const [user, setUser] = useState(null)
   const [issues, setIssues] = useState([])
@@ -80,6 +98,7 @@ function App() {
   const [users, setUsers] = useState([])
   // Логины, которых GitHub примет исполнителями: у остальных назначение молча пропадёт.
   const [assignable, setAssignable] = useState([])
+  const [boardReady, setBoardReady] = useState(false)
 
   const [board, setBoard] = useState(readView)
   const [openNumber, setOpenNumber] = useState(null)
@@ -89,15 +108,44 @@ function App() {
   const [overColumn, setOverColumn] = useState(null)
 
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingIssueNumbers, setPendingIssueNumbers] = useState([])
   const [error, setError] = useState('')
+  const pendingIssueNumbersRef = useRef(new Set())
 
   useEffect(() => writeView(board), [board])
 
   const patchBoard = (change) => setBoard((current) => ({ ...current, ...change }))
 
-  const loadBoard = useCallback(async () => {
-    setLoading(true)
+  const setIssuePending = useCallback((number, pending) => {
+    const next = new Set(pendingIssueNumbersRef.current)
+    if (pending) next.add(number)
+    else next.delete(number)
+    pendingIssueNumbersRef.current = next
+    setPendingIssueNumbers([...next])
+  }, [])
+
+  const applyBoard = useCallback(({ issues: loadedIssues, statuses: loadedStatuses, labels: loadedLabels, users: loadedUsers, assignable: loadedAssignable }) => {
+    setIssues((current) => mergeBoardIssues(current, loadedIssues, pendingIssueNumbersRef.current))
+    setStatuses(loadedStatuses)
+    setLabels(loadedLabels)
+    setUsers(loadedUsers)
+    setAssignable(loadedAssignable)
+    setBoardReady(true)
+  }, [])
+
+  const loadBoard = useCallback(async (currentUser = user, useCached = true) => {
+    if (!currentUser) return
+
+    setRefreshing(true)
+    const cached = useCached ? readBoardCache(currentUser.id) : null
+    if (cached) {
+      applyBoard(cached)
+      setLoading(false)
+    } else if (useCached) {
+      setLoading(true)
+    }
     setError('')
     try {
       const [loadedIssues, loadedStatuses, loadedLabels, loadedUsers, loadedAssignable] = await Promise.all([
@@ -107,17 +155,20 @@ function App() {
         api('/api/board/users'),
         api('/api/board/assignees'),
       ])
-      setIssues(loadedIssues)
-      setStatuses(loadedStatuses)
-      setLabels(loadedLabels)
-      setUsers(loadedUsers)
-      setAssignable(loadedAssignable)
+      applyBoard({
+        issues: loadedIssues,
+        statuses: loadedStatuses,
+        labels: loadedLabels,
+        users: loadedUsers,
+        assignable: loadedAssignable,
+      })
     } catch (requestError) {
       setError(requestError.message)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }, [])
+  }, [applyBoard, user])
 
   useEffect(() => {
     async function restoreSession() {
@@ -135,11 +186,18 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      loadBoard()
+      loadBoard(user)
     }
   }, [user, loadBoard])
 
+  useEffect(() => {
+    if (user && boardReady) {
+      writeBoardCache(user.id, { issues, statuses, labels, users, assignable })
+    }
+  }, [user, boardReady, issues, statuses, labels, users, assignable])
+
   const candidates = useMemo(() => getAssigneeCandidates(issues, users, assignable), [issues, users, assignable])
+  const avatarUrls = useMemo(() => getAvatarUrls(issues, assignable), [issues, assignable])
   const filtered = useMemo(() => visibleTasks(issues, board.query, board.filters), [issues, board.query, board.filters])
   const columns = useMemo(
     () => buildColumns(filtered, board.groupBy, { statuses, candidates, labels }),
@@ -166,53 +224,99 @@ function App() {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' })
+    clearBoardCache(user.id)
     setUser(null)
     setIssues([])
     setStatuses([])
+    setLabels([])
+    setUsers([])
+    setAssignable([])
+    setBoardReady(false)
+    setPendingIssueNumbers([])
+    pendingIssueNumbersRef.current = new Set()
     setOpenNumber(null)
     setError('')
   }
 
   async function save(task, number) {
-    setSaving(true)
     setError('')
+    const temporaryNumber = number ? null : -Date.now()
+    const original = number ? issues.find((issue) => issue.number === number) : null
+
+    if (number && !original) return
+
+    if (number) {
+      setIssues((current) => current.map((issue) => (
+        issue.number === number ? applyOverrides(issue, task, labels) : issue
+      )))
+    } else {
+      setIssues((current) => [...current, {
+        ...task,
+        number: temporaryNumber,
+        state: task.status === 'done' ? 'closed' : 'open',
+        htmlUrl: '',
+        labels: task.labels.map((name) => labels.find((label) => label.name === name) || { name, color: 'e2e8f0' }),
+        assignees: task.assignees.map((login) => ({ login, avatarUrl: '' })),
+      }])
+    }
+    setIssuePending(number || temporaryNumber, true)
+    setOpenNumber(null)
+    setCreating(null)
+
+    let savedSuccessfully = false
     try {
-      await (number
+      const saved = await (number
         ? api(`/api/board/issues/${number}`, { method: 'PUT', body: JSON.stringify(task) })
         : api('/api/board/issues', { method: 'POST', body: JSON.stringify(task) }))
-      setOpenNumber(null)
-      setCreating(null)
-      await loadBoard()
+      setIssues((current) => number
+        ? current.map((issue) => (issue.number === number ? saved : issue))
+        : current.map((issue) => (issue.number === temporaryNumber ? saved : issue)))
+      savedSuccessfully = true
     } catch (requestError) {
+      if (number) {
+        setIssues((current) => current.map((issue) => (issue.number === number ? original : issue)))
+      } else {
+        setIssues((current) => current.filter((issue) => issue.number !== temporaryNumber))
+      }
       setError(requestError.message)
     } finally {
-      setSaving(false)
+      setIssuePending(number || temporaryNumber, false)
+      if (savedSuccessfully) void loadBoard(user, false)
     }
   }
 
   // Карточка переезжает в интерфейсе сразу, а при отказе GitHub возвращается на место.
   async function moveTask(number, columnKey) {
+    if (pendingIssueNumbersRef.current.has(number)) {
+      return
+    }
     const issue = issues.find((candidate) => candidate.number === number)
     const overrides = issue && getMoveOverrides(issue, board.groupBy, columnKey)
     if (!overrides) {
       return
     }
 
-    const restore = issues
+    const restore = issue
+    setIssuePending(number, true)
     setIssues((current) => current.map((item) => (
       item.number === number ? applyOverrides(item, overrides, labels) : item
     )))
     setError('')
 
+    let savedSuccessfully = false
     try {
       const saved = await api(`/api/board/issues/${number}`, {
         method: 'PUT',
         body: JSON.stringify(toPayload(issue, overrides)),
       })
       setIssues((current) => current.map((item) => (item.number === number ? saved : item)))
+      savedSuccessfully = true
     } catch (requestError) {
-      setIssues(restore)
+      setIssues((current) => current.map((item) => (item.number === number ? restore : item)))
       setError(`Не удалось перенести #${number}: ${requestError.message}`)
+    } finally {
+      setIssuePending(number, false)
+      if (savedSuccessfully) void loadBoard(user, false)
     }
   }
 
@@ -255,8 +359,8 @@ function App() {
     <div className="page">
       <Header
         user={user}
-        loading={loading}
-        onRefresh={loadBoard}
+        loading={loading || refreshing}
+        onRefresh={() => loadBoard()}
         onCreate={() => setCreating({})}
         onLogout={logout}
       />
@@ -289,20 +393,21 @@ function App() {
 
       {loading && <p className="message">Загружаем актуальные задачи из GitHub…</p>}
 
-      {!loading && board.view === 'list' && (
-        <ListView columns={columns} onOpen={(issue) => setOpenNumber(issue.number)} />
+      {boardReady && board.view === 'list' && (
+        <ListView columns={columns} pendingIssueNumbers={pendingIssueNumbers} onOpen={(issue) => setOpenNumber(issue.number)} />
       )}
 
-      {!loading && board.view === 'table' && (
-        <TableView columns={columns} statuses={statuses} onOpen={(issue) => setOpenNumber(issue.number)} />
+      {boardReady && board.view === 'table' && (
+        <TableView columns={columns} statuses={statuses} pendingIssueNumbers={pendingIssueNumbers} onOpen={(issue) => setOpenNumber(issue.number)} />
       )}
 
-      {!loading && board.view === 'board' && (
+      {boardReady && board.view === 'board' && (
         <BoardView
           columns={columns}
           draggedId={draggedId}
           overColumn={overColumn}
           saving={saving}
+          pendingIssueNumbers={pendingIssueNumbers}
           onOpen={(issue) => setOpenNumber(issue.number)}
           onDragStart={setDraggedId}
           onDragEnd={() => {
@@ -330,6 +435,7 @@ function App() {
           statuses={statuses}
           labels={labels}
           candidates={candidates}
+          avatarUrls={avatarUrls}
           saving={saving}
           onClose={() => setCreating(null)}
           onCreate={(task) => save(task)}
@@ -345,6 +451,7 @@ function App() {
           statuses={statuses}
           labels={labels}
           candidates={candidates}
+          avatarUrls={avatarUrls}
           saving={saving}
           onClose={() => setOpenNumber(null)}
           onSave={(task) => save(task, openIssue.number)}

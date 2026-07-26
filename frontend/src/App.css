@@ -695,6 +695,14 @@
   opacity: 0.4;
 }
 
+.task-card-pending,
+.list-row-pending,
+.table-row-pending {
+  opacity: 0.5;
+  cursor: wait;
+  pointer-events: none;
+}
+
 .task-card-head {
   display: flex;
   align-items: center;

@@ -3,7 +3,7 @@ import { Avatar, LabelChip, PlatformChip, PriorityPill } from './atoms.jsx'
 
 const headers = ['#', 'ЗАДАЧА', 'СТАТУС', 'ПЛАТФОРМЫ', 'ЛЕЙБЛЫ', 'ИСПОЛНИТЕЛЬ', 'ПРИОРИТЕТ']
 
-export function TableView({ columns, statuses, onOpen }) {
+export function TableView({ columns, statuses, pendingIssueNumbers = [], onOpen }) {
   // Таблица уважает выбранную группировку, поэтому один и тот же режим даёт разрез
   // по статусу, платформам или исполнителям. В многозначных разрезах задача повторяется.
   const groups = columns.filter((column) => column.issues.length > 0)
@@ -25,7 +25,12 @@ export function TableView({ columns, statuses, onOpen }) {
           {column.issues.map((issue) => {
             const status = statuses.find((candidate) => candidate.key === issue.status)
             return (
-              <div className="table-row" key={issue.number} onClick={() => onOpen(issue)}>
+              <div
+                className={pendingIssueNumbers.includes(issue.number) ? 'table-row table-row-pending' : 'table-row'}
+                key={issue.number}
+                aria-disabled={pendingIssueNumbers.includes(issue.number)}
+                onClick={() => !pendingIssueNumbers.includes(issue.number) && onOpen(issue)}
+              >
                 <span className="list-number">#{issue.number}</span>
                 <span className="table-title">{issue.title}</span>
                 <span className="table-status" style={{ color: status ? `#${status.color}` : 'var(--muted)' }}>
@@ -38,7 +43,7 @@ export function TableView({ columns, statuses, onOpen }) {
                   {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
                 </span>
                 <span className="list-avatars table-assignees">
-                  {issue.assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} />)}
+                  {issue.assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} avatarUrl={assignee.avatarUrl} />)}
                 </span>
                 <span>
                   <PriorityPill priority={issue.priority} bare />

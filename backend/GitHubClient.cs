@@ -117,7 +117,7 @@ public sealed class GitHubClient(HttpClient httpClient)
     /// можно только пользователя с доступом к репозиторию, а чужой логин GitHub молча отбросит —
     /// задача сохранилась бы без исполнителя.
     /// </summary>
-    public async Task<IReadOnlyList<string>> GetAssignableUsersAsync(
+    public async Task<IReadOnlyList<GitHubAssignee>> GetAssignableUsersAsync(
         string owner,
         string repository,
         CancellationToken cancellationToken)
@@ -126,7 +126,7 @@ public sealed class GitHubClient(HttpClient httpClient)
             $"repos/{RepositoryPath(owner, repository)}/assignees?per_page=100",
             cancellationToken);
 
-        return users.Select(user => user.Login).ToList();
+        return users.Select(user => new GitHubAssignee(user.Login, user.AvatarUrl)).ToList();
     }
 
     public async Task<IReadOnlyList<BoardStatus>> GetStatusesAsync(

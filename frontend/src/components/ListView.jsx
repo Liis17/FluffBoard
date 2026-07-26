@@ -1,7 +1,7 @@
 import { getPriority } from '../board.js'
 import { Avatar, LabelChip } from './atoms.jsx'
 
-export function ListView({ columns, onOpen }) {
+export function ListView({ columns, pendingIssueNumbers = [], onOpen }) {
   return (
     <div className="list-view">
       {columns.filter((column) => column.issues.length > 0).map((column) => (
@@ -16,7 +16,12 @@ export function ListView({ columns, onOpen }) {
             {column.issues.map((issue) => {
               const priority = getPriority(issue.priority)
               return (
-                <div className="list-row" key={issue.number} onClick={() => onOpen(issue)}>
+                <div
+                  className={pendingIssueNumbers.includes(issue.number) ? 'list-row list-row-pending' : 'list-row'}
+                  key={issue.number}
+                  aria-disabled={pendingIssueNumbers.includes(issue.number)}
+                  onClick={() => !pendingIssueNumbers.includes(issue.number) && onOpen(issue)}
+                >
                   <span className="list-priority" style={{ color: priority.color }} title={priority.title}>
                     {priority.icon}
                   </span>
@@ -26,7 +31,7 @@ export function ListView({ columns, onOpen }) {
                     {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
                   </span>
                   <span className="list-avatars">
-                    {issue.assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} />)}
+                    {issue.assignees.map((assignee) => <Avatar key={assignee.login} login={assignee.login} avatarUrl={assignee.avatarUrl} />)}
                   </span>
                 </div>
               )

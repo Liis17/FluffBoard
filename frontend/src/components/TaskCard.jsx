@@ -1,24 +1,29 @@
 import { getPriority } from '../board.js'
 import { AvatarStack, GitHubLink, LabelChip, PlatformChip, PriorityPill } from './atoms.jsx'
 
-export function TaskCard({ issue, onOpen, dragging, onDragStart, onDragEnd }) {
+export function TaskCard({ issue, onOpen, dragging, pending, onDragStart, onDragEnd }) {
   return (
     <article
-      className={dragging ? 'task-card task-card-dragging' : 'task-card'}
+      className={pending ? 'task-card task-card-pending' : dragging ? 'task-card task-card-dragging' : 'task-card'}
       style={{ borderLeftColor: getPriority(issue.priority).color }}
-      draggable
+      draggable={!pending}
+      aria-disabled={pending}
       onDragStart={(event) => {
+        if (pending) {
+          event.preventDefault()
+          return
+        }
         event.dataTransfer.effectAllowed = 'move'
         // Без setData перетаскивание не стартует в Firefox.
         event.dataTransfer.setData('text/plain', String(issue.number))
         onDragStart()
       }}
       onDragEnd={onDragEnd}
-      onClick={() => onOpen(issue)}
+      onClick={() => !pending && onOpen(issue)}
     >
       <div className="task-card-head">
         <PriorityPill priority={issue.priority} />
-        <span className="task-number">#{issue.number}</span>
+        <span className="task-number">{issue.number > 0 ? `#${issue.number}` : 'Создаём…'}</span>
       </div>
 
       <h3 className="task-title">{issue.title}</h3>
@@ -32,7 +37,7 @@ export function TaskCard({ issue, onOpen, dragging, onDragStart, onDragEnd }) {
 
       <div className="task-card-foot">
         <AvatarStack assignees={issue.assignees} />
-        <GitHubLink url={issue.htmlUrl} />
+        {issue.htmlUrl && <GitHubLink url={issue.htmlUrl} />}
       </div>
     </article>
   )

@@ -24,6 +24,7 @@ export const platforms = [
 
 export const groupings = [
   { id: 'status', title: 'Статус' },
+  { id: 'priority', title: 'Срочность' },
   { id: 'platform', title: 'Платформа' },
   { id: 'assignee', title: 'Исполнитель' },
   { id: 'label', title: 'Лейбл' },
@@ -116,10 +117,21 @@ export function visibleTasks(issues, query, filters) {
   })
 }
 
+/** Фоновая загрузка не должна затирать карточку, которую GitHub ещё подтверждает. */
+export function mergeBoardIssues(currentIssues, loadedIssues, pendingIssueNumbers) {
+  const currentByNumber = new Map(currentIssues.map((issue) => [issue.number, issue]))
+  const refreshed = loadedIssues.map((issue) => (
+    pendingIssueNumbers.has(issue.number) ? currentByNumber.get(issue.number) || issue : issue
+  ))
+  const temporary = currentIssues.filter((issue) => issue.number < 0 && pendingIssueNumbers.has(issue.number))
+
+  return [...refreshed, ...temporary]
+}
+
 export function buildColumns(issues, groupBy, { statuses, candidates, labels }) {
   // Статус разбирается первым, потому что только в нём нет колонки завершённых.
   // Незнакомый разрез (правленый вручную URL) тоже показывается статусами, как и раньше.
-  if (groupBy !== 'platform' && groupBy !== 'assignee' && groupBy !== 'label') {
+  if (groupBy !== 'priority' && groupBy !== 'platform' && groupBy !== 'assignee' && groupBy !== 'label') {
     return statuses.map((status) => ({
       key: status.key,
       name: status.name,
@@ -139,6 +151,16 @@ export function buildColumns(issues, groupBy, { statuses, candidates, labels }) 
     color: doneColor,
     droppable: false,
     issues: issues.filter((issue) => issue.status === 'done'),
+  }
+
+  if (groupBy === 'priority') {
+    return [...priorities.map((priority) => ({
+      key: priority.id,
+      name: priority.title,
+      color: priority.color,
+      droppable: true,
+      issues: active.filter((issue) => issue.priority === priority.id),
+    })), doneColumn]
   }
 
   if (groupBy === 'platform') {
@@ -226,6 +248,10 @@ export function getMoveOverrides(issue, groupBy, columnKey) {
     return unchanged ? null : { assignees }
   }
 
+  if (groupBy === 'priority') {
+    return issue.priority === columnKey ? null : { priority: columnKey }
+  }
+
   if (groupBy === 'label') {
     // Лейбл добавляется, а не заменяет остальные; повторное добавление игнорируется.
     if (columnKey === unlabelledKey || issue.labels.some((label) => label.name === columnKey)) {
@@ -243,7 +269,7 @@ export function getMoveOverrides(issue, groupBy, columnKey) {
  * ничего не задают — задача с пустым полем и так попадёт в свою.
  */
 export function getColumnDraft(groupBy, columnKey) {
-  const blank = { status: '', platforms: [], assignees: [], labels: [] }
+  const blank = { status: '', priority: 'medium', platforms: [], assignees: [], labels: [] }
 
   return getMoveOverrides(blank, groupBy, columnKey) || {}
 }
@@ -370,6 +396,19 @@ export function getProgress(issues, groupBy, { statuses, candidates }) {
           count: issues.filter((issue) => issue.assignees.length === 0).length,
         },
       ]),
+    }
+  }
+
+  if (groupBy === 'priority') {
+    return {
+      ...base,
+      mode: 'share',
+      segments: shareSegments(priorities.map((priority) => ({
+        key: priority.id,
+        name: priority.title,
+        color: priority.color,
+        count: issues.filter((issue) => issue.priority === priority.id).length,
+      }))),
     }
   }
 

@@ -13,7 +13,7 @@ const emptyDraft = {
   platforms: [],
 }
 
-export function NewTaskModal({ prefill, statuses, labels, candidates, saving, onClose, onCreate, onCreateLabel, onUpload }) {
+export function NewTaskModal({ prefill, statuses, labels, candidates, avatarUrls, saving, onClose, onCreate, onCreateLabel, onUpload }) {
   const [draft, setDraft] = useState({ ...emptyDraft, ...prefill })
 
   function submit(event) {
@@ -62,6 +62,7 @@ export function NewTaskModal({ prefill, statuses, labels, candidates, saving, on
             statuses={statuses}
             labels={labels}
             candidates={candidates}
+            avatarUrls={avatarUrls}
             onChange={setDraft}
             onCreateLabel={onCreateLabel}
           />

@@ -26,12 +26,15 @@ ValidateBoardOptions(boardOptions);
 
 builder.Services.AddSingleton(boardOptions);
 builder.Services.AddSingleton<BoardDatabase>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<BoardCache>();
 builder.Services.AddHttpClient<GitHubClient>(client =>
     GitHubClient.Configure(client, builder.Configuration["GitHub:Token"]));
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.Cookie.Name = "FluffBoard.Session";
+        options.ExpireTimeSpan = TimeSpan.FromDays(3);
         options.SlidingExpiration = true;
         options.Events.OnRedirectToLogin = context =>
         {
@@ -90,7 +93,15 @@ app.MapPost("/api/auth/login", async (
             new Claim(ClaimTypes.Name, user.Username)
         ],
         CookieAuthenticationDefaults.AuthenticationScheme));
-    await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+    await context.SignInAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        principal,
+        new AuthenticationProperties
+        {
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(3),
+            AllowRefresh = true
+        });
     return Results.Ok(ToProfile(user));
 });
 
@@ -121,11 +132,12 @@ board.MapGet("/me", async (ClaimsPrincipal principal, BoardDatabase database, Ca
 board.MapGet("/users", async (BoardDatabase database, CancellationToken cancellationToken) =>
     Results.Ok(await database.GetProfilesAsync(cancellationToken)));
 
-board.MapGet("/issues", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+board.MapGet("/issues", async (GitHubClient gitHubClient, BoardCache cache, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try
     {
-        var issues = await gitHubClient.GetIssuesAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        var issues = await cache.GetIssuesAsync(() =>
+            gitHubClient.GetIssuesAsync(options.Repository.Owner, options.Repository.Name, cancellationToken));
         return Results.Ok(issues);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -139,16 +151,18 @@ board.MapGet("/issues", async (GitHubClient gitHubClient, BoardOptions options, 
 board.MapGet("/issues/{number:int}/comments", async (
     int number,
     GitHubClient gitHubClient,
+    BoardCache cache,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
     try
     {
-        var comments = await gitHubClient.GetCommentsAsync(
-            options.Repository.Owner,
-            options.Repository.Name,
-            number,
-            cancellationToken);
+        var comments = await cache.GetCommentsAsync(number, () =>
+            gitHubClient.GetCommentsAsync(
+                options.Repository.Owner,
+                options.Repository.Name,
+                number,
+                cancellationToken));
         return Results.Ok(comments);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -157,11 +171,12 @@ board.MapGet("/issues/{number:int}/comments", async (
     }
 });
 
-board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+board.MapGet("/labels", async (GitHubClient gitHubClient, BoardCache cache, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try
     {
-        var labels = await gitHubClient.GetLabelsAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        var labels = await cache.GetLabelsAsync(() =>
+            gitHubClient.GetLabelsAsync(options.Repository.Owner, options.Repository.Name, cancellationToken));
         // Служебные лейблы редактируются статусом и приоритетом, в выборе обычных меток им не место.
         return Results.Ok(labels.Where(label => !GitHubClient.IsServiceLabel(label.Name)));
     }
@@ -214,11 +229,12 @@ board.MapPost("/assets", async (
 // Сессия живёт в cookie с SameSite=Lax, поэтому чужая страница этот POST не отправит.
 .DisableAntiforgery();
 
-board.MapGet("/assignees", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+board.MapGet("/assignees", async (GitHubClient gitHubClient, BoardCache cache, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try
     {
-        var logins = await gitHubClient.GetAssignableUsersAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        var logins = await cache.GetAssigneesAsync(() =>
+            gitHubClient.GetAssignableUsersAsync(options.Repository.Owner, options.Repository.Name, cancellationToken));
         return Results.Ok(logins);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -230,6 +246,7 @@ board.MapGet("/assignees", async (GitHubClient gitHubClient, BoardOptions option
 board.MapPost("/labels", async (
     LabelRequest request,
     GitHubClient gitHubClient,
+    BoardCache cache,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
@@ -248,6 +265,7 @@ board.MapPost("/labels", async (
     try
     {
         var label = await gitHubClient.CreateLabelAsync(options.Repository.Owner, options.Repository.Name, name, cancellationToken);
+        cache.InvalidateLabelsAndStatuses();
         return Results.Created($"/api/board/labels/{Uri.EscapeDataString(label.Name)}", label);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -256,11 +274,12 @@ board.MapPost("/labels", async (
     }
 });
 
-board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
+board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardCache cache, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try
     {
-        var statuses = await gitHubClient.GetStatusesAsync(options.Repository.Owner, options.Repository.Name, cancellationToken);
+        var statuses = await cache.GetStatusesAsync(() =>
+            gitHubClient.GetStatusesAsync(options.Repository.Owner, options.Repository.Name, cancellationToken));
         return Results.Ok(statuses);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -272,6 +291,7 @@ board.MapGet("/statuses", async (GitHubClient gitHubClient, BoardOptions options
 board.MapPost("/statuses", async (
     StatusRequest request,
     GitHubClient gitHubClient,
+    BoardCache cache,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
@@ -290,6 +310,7 @@ board.MapPost("/statuses", async (
     try
     {
         var status = await gitHubClient.CreateStatusAsync(options.Repository.Owner, options.Repository.Name, name, cancellationToken);
+        cache.InvalidateLabelsAndStatuses();
         // Ключ пользовательской колонки — произвольный текст, в том числе русский, а заголовок
         // Location обязан быть ASCII: без экранирования Kestrel рвёт уже успешный ответ.
         return Results.Created($"/api/board/statuses/{Uri.EscapeDataString(status.Key)}", status);
@@ -303,6 +324,7 @@ board.MapPost("/statuses", async (
 board.MapPost("/issues", async (
     IssueRequest request,
     GitHubClient gitHubClient,
+    BoardCache cache,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
@@ -326,6 +348,8 @@ board.MapPost("/issues", async (
                 NormalizePriority(request.Priority),
                 NormalizePlatforms(request.Platforms)),
             cancellationToken);
+        cache.InvalidateIssues();
+        cache.InvalidateLabelsAndStatuses();
         return Results.Created($"/api/board/issues/{issue.Number}", issue);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))
@@ -338,6 +362,7 @@ board.MapPut("/issues/{number:int}", async (
     int number,
     IssueRequest request,
     GitHubClient gitHubClient,
+    BoardCache cache,
     BoardOptions options,
     CancellationToken cancellationToken) =>
 {
@@ -362,6 +387,8 @@ board.MapPut("/issues/{number:int}", async (
                 NormalizePriority(request.Priority),
                 NormalizePlatforms(request.Platforms)),
             cancellationToken);
+        cache.InvalidateIssues();
+        cache.InvalidateLabelsAndStatuses();
         return Results.Ok(issue);
     }
     catch (Exception exception) when (IsGitHubFailure(exception))

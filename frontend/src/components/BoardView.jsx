@@ -13,6 +13,7 @@ export function BoardView({
   draggedId,
   overColumn,
   saving,
+  pendingIssueNumbers = [],
   onOpen,
   onDragStart,
   onDragEnd,
@@ -51,6 +52,7 @@ export function BoardView({
                   issue={issue}
                   onOpen={onOpen}
                   dragging={draggedId === issue.number}
+                  pending={pendingIssueNumbers.includes(issue.number)}
                   onDragStart={() => onDragStart(issue.number)}
                   onDragEnd={onDragEnd}
                 />

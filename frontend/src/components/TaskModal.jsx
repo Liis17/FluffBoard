@@ -18,7 +18,7 @@ function toDraft(issue) {
   }
 }
 
-export function TaskModal({ issue, statuses, labels, candidates, saving, onClose, onSave, onCreateLabel, onUpload, onLoadComments }) {
+export function TaskModal({ issue, statuses, labels, candidates, avatarUrls, saving, onClose, onSave, onCreateLabel, onUpload, onLoadComments }) {
   // Задача открывается на чтение, а поля появляются по «Редактировать»: чаще в неё заходят
   // посмотреть, а не править.
   const [editing, setEditing] = useState(false)
@@ -135,6 +135,7 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
             statuses={statuses}
             labels={labels}
             candidates={candidates}
+            avatarUrls={avatarUrls}
             onChange={setDraft}
             onCreateLabel={onCreateLabel}
           />

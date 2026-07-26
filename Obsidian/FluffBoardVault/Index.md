@@ -15,6 +15,7 @@ FluffBoard — Kanban-доска одной GitHub-репозитории: React
 |------|-----------|----------|
 | [[backend/API]] | API | Вход, SQLite-пользователи и защищённое API Kanban-доски |
 | [[backend/GitHubClient]] | GitHub client | Получает и изменяет GitHub issues, labels и assignees |
+| [[backend/Кэш доски]] | Кэш GitHub | Коротко хранит ответы GitHub и сбрасывает их после записи |
 | [[backend/BoardDatabase]] | Локальная база | SQLite-пользователи доски и хеширование паролей |
 | [[backend/Конфигурация]] | Конфигурация | `.env`, одна репозитория и связанные идентичности пользователей |
 
