@@ -76,6 +76,30 @@ public sealed class GitHubClient(HttpClient httpClient)
             .ToList();
     }
 
+    /// <summary>
+    /// Комментарии одной задачи. Доска их только показывает: писать она может лишь от сервисного
+    /// аккаунта, а комментарий не от своего имени — не то, чего ждёт автор.
+    /// </summary>
+    public async Task<IReadOnlyList<GitHubComment>> GetCommentsAsync(
+        string owner,
+        string repository,
+        int number,
+        CancellationToken cancellationToken)
+    {
+        var comments = await GetAllAsync<GitHubCommentResponse>(
+            $"repos/{RepositoryPath(owner, repository)}/issues/{number}/comments?per_page=100",
+            cancellationToken);
+
+        return comments
+            .Select(comment => new GitHubComment(
+                comment.Id,
+                new GitHubAssignee(comment.User.Login, comment.User.AvatarUrl),
+                comment.Body ?? "",
+                comment.CreatedAt,
+                comment.HtmlUrl))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<GitHubLabel>> GetLabelsAsync(
         string owner,
         string repository,
@@ -591,6 +615,13 @@ public sealed class GitHubClient(HttpClient httpClient)
         string Login,
         [property: JsonPropertyName("avatar_url")] string AvatarUrl);
 
+    private sealed record GitHubCommentResponse(
+        long Id,
+        string? Body,
+        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+        [property: JsonPropertyName("html_url")] string HtmlUrl,
+        GitHubAssigneeResponse User);
+
     private sealed record GitHubErrorResponse(string? Message);
 
     private sealed record ServiceLabelEntry(string Key, string Name, string Color);
@@ -611,6 +642,13 @@ public sealed record GitHubIssue(
 public sealed record GitHubLabel(string Name, string Color);
 
 public sealed record GitHubAssignee(string Login, string AvatarUrl);
+
+public sealed record GitHubComment(
+    long Id,
+    GitHubAssignee Author,
+    string Body,
+    DateTimeOffset CreatedAt,
+    string HtmlUrl);
 
 public sealed record BoardStatus(string Key, string Name, string Color);
 

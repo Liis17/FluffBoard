@@ -130,6 +130,29 @@ board.MapGet("/issues", async (GitHubClient gitHubClient, BoardOptions options, 
     }
 });
 
+// Комментарии грузятся только по открытой задаче: у GitHub нет способа получить их сразу для всей
+// доски, а запрос на каждую из сотни задач ради списка карточек не нужен.
+board.MapGet("/issues/{number:int}/comments", async (
+    int number,
+    GitHubClient gitHubClient,
+    BoardOptions options,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var comments = await gitHubClient.GetCommentsAsync(
+            options.Repository.Owner,
+            options.Repository.Name,
+            number,
+            cancellationToken);
+        return Results.Ok(comments);
+    }
+    catch (Exception exception) when (IsGitHubFailure(exception))
+    {
+        return ToGitHubProblem(exception);
+    }
+});
+
 board.MapGet("/labels", async (GitHubClient gitHubClient, BoardOptions options, CancellationToken cancellationToken) =>
 {
     try

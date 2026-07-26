@@ -21,6 +21,12 @@ Accept: application/json
 
 ###
 
+# Comments of a single issue, read-only: the board writes from a service account and never posts.
+GET {{backend_HostAddress}}/api/board/issues/1/comments
+Accept: application/json
+
+###
+
 # Board columns: the six built-in statuses plus any custom status:* label.
 GET {{backend_HostAddress}}/api/board/statuses
 Accept: application/json
