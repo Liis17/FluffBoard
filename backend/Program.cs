@@ -55,6 +55,10 @@ await app.Services.GetRequiredService<BoardDatabase>()
     .InitializeAsync(boardOptions.Users, CancellationToken.None);
 
 app.UseCors();
+// В контейнере собранный клиент лежит в `wwwroot` рядом с backend: один origin избавляет
+// cookie-сессию от CORS. В development каталога нет — статику отдаёт Vite.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -365,6 +369,12 @@ board.MapPut("/issues/{number:int}", async (
         return ToGitHubProblem(exception);
     }
 });
+
+// Прямой заход по любому адресу должен отдавать клиента, а не 404: вид доски живёт в
+// query-параметрах, и ссылкой пересылается весь адрес целиком.
+app.MapFallbackToFile("index.html");
+// Неизвестный путь API остаётся 404: index.html вместо ошибки читался бы как поломка клиента.
+app.MapFallback("/api/{*path}", () => Results.NotFound());
 
 app.Run();
 

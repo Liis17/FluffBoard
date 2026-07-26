@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+# Slim Dockerfile для CI: `dotnet publish` выполняет раннер, в Docker остаётся только сборка клиента —
+# так на раннере не нужен Node.
+
+# Этап 1: сборка Vite-клиента
+FROM node:22-alpine AS client
+WORKDIR /build
+# package.json и lock копируются отдельно от исходников, чтобы слой с npm ci переиспользовался,
+# пока зависимости не менялись.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# Итоговый образ: alpine, а не chiseled — каталог SQLite нужно создать и передать пользователю
+# приложения, для этого нужен shell.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+WORKDIR /app
+COPY publish/ .
+# Собранный клиент отдаёт сам backend, поэтому у доски один origin и cookie-сессии не нужен CORS.
+COPY --from=client /build/dist ./wwwroot
+RUN mkdir -p /app/data && chown app:app /app/data
+USER $APP_UID
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "backend.dll"]

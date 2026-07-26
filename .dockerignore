@@ -1,0 +1,21 @@
+# publish/ в контекст входит намеренно: его собирает раннер до docker build.
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/.idea
+**/.DS_Store
+**/bin
+**/obj
+**/data
+**/dist
+**/node_modules
+**/docker-compose*
+**/Dockerfile*
+docker/
+docs/
+Obsidian/
+LICENSE
+README.md
