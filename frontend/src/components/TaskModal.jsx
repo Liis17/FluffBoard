@@ -4,7 +4,7 @@ import { MarkdownEditor } from './MarkdownEditor.jsx'
 import { Modal } from './Modal.jsx'
 import { TaskComments } from './TaskComments.jsx'
 import { TaskFields } from './TaskFields.jsx'
-import { GitHubLink, LabelChip, PlatformChip, PriorityPill, StatusChip } from './atoms.jsx'
+import { AvatarStack, GitHubLink, LabelChip, PlatformChip, PriorityPill, StatusChip } from './atoms.jsx'
 
 function toDraft(issue) {
   return {
@@ -86,6 +86,7 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
               <PriorityPill priority={issue.priority} />
               {issue.platforms.map((platform) => <PlatformChip key={platform} id={platform} />)}
               {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
+              <AvatarStack assignees={issue.assignees} />
             </div>
 
             <TaskComments comments={comments} error={commentsError} />
