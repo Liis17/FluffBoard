@@ -22,13 +22,15 @@ export function BoardView({
   onCreateTask,
   onAddColumn,
 }) {
-  // Колонка завершённых на доске одна, поэтому состояния на каждую колонку не нужно.
+  // Секция завершённых на доске одна, поэтому состояния на каждую колонку не нужно.
   const [allDone, setAllDone] = useState(false)
 
   return (
     <div className="board" role="list">
       {columns.map((column) => {
-        const foldable = column.key === doneKey && column.issues.length > donePreview
+        // В разрезе по статусу готовые приходят обычной колонкой с ключом `done`,
+        // в остальных — служебной «Завершено» с `doneKey`.
+        const foldable = (column.key === doneKey || column.key === 'done') && column.issues.length > donePreview
         const visible = foldable && !allDone ? column.issues.slice(0, donePreview) : column.issues
 
         return (
