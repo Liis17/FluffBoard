@@ -36,8 +36,8 @@ runs:
       run: |
         REGISTRY="docker.barkfluff.com:5000"
 
-        # -k: самоподписанный сертификат; 404 (репозитория ещё нет) не валит шаг
-        RESP=$(curl -sk -u "$REG_USER:$REG_PASS" "https://$REGISTRY/v2/$IMAGE/tags/list" || true)
+        # 404 (репозитория ещё нет) не валит шаг
+        RESP=$(curl -s -u "$REG_USER:$REG_PASS" "https://$REGISTRY/v2/$IMAGE/tags/list" || true)
 
         # || true: grep без совпадений даёт exit 1 — под set -e -o pipefail это валит шаг
         LAST=$(echo "$RESP" | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"' | sort -V | tail -n1 || true)

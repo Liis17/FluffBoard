@@ -19,18 +19,15 @@ permissions:
 jobs:
   build:
     name: "🐳 Сборка и публикация FluffBoard"
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Клиент собирается внутри Docker, поэтому Node на раннере не нужен — только .NET.
-      - name: "🔍 Проверка .NET 10 SDK"
-        run: |
-          if ! dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
-            echo "::error::.NET 10 SDK не установлен на раннере"
-            dotnet --list-sdks || true
-            exit 1
-          fi
+      # Клиент собирается внутри Docker, поэтому Node на runner не нужен — только .NET.
+      - name: "⚙️ Установка .NET 10 SDK"
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
 
       - name: "⚙️ dotnet publish (Linux Release)"
         run: |
