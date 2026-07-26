@@ -746,6 +746,18 @@
 }
 
 /* Платформа — контурный чип: так она читается как измерение, а не как метка GitHub. */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid;
+  border-radius: 20px;
+  background: var(--card-bg);
+  padding: 3px 10px;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+
 .platform-chip {
   display: inline-flex;
   align-items: center;

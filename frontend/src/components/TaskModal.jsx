@@ -4,7 +4,7 @@ import { MarkdownEditor } from './MarkdownEditor.jsx'
 import { Modal } from './Modal.jsx'
 import { TaskComments } from './TaskComments.jsx'
 import { TaskFields } from './TaskFields.jsx'
-import { GitHubLink, LabelChip } from './atoms.jsx'
+import { GitHubLink, LabelChip, PlatformChip, PriorityPill, StatusChip } from './atoms.jsx'
 
 function toDraft(issue) {
   return {
@@ -54,6 +54,8 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
     setEditing(false)
   }
 
+  const status = statuses.find((candidate) => candidate.key === issue.status)
+
   const head = (
     <header className="modal-head">
       <div>
@@ -78,13 +80,15 @@ export function TaskModal({ issue, statuses, labels, candidates, saving, onClose
               ? <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(issue.body) }} />
               : <p className="markdown-body markdown-empty">Описания пока нет.</p>}
 
-            <TaskComments comments={comments} error={commentsError} />
+            {/* Бейджи стоят над обсуждением: под длинной перепиской их пришлось бы искать прокруткой. */}
+            <div className="pill-row">
+              {status && <StatusChip status={status} />}
+              <PriorityPill priority={issue.priority} />
+              {issue.platforms.map((platform) => <PlatformChip key={platform} id={platform} />)}
+              {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
+            </div>
 
-            {issue.labels.length > 0 && (
-              <div className="pill-row">
-                {issue.labels.map((label) => <LabelChip key={label.name} label={label} />)}
-              </div>
-            )}
+            <TaskComments comments={comments} error={commentsError} />
           </div>
 
           <footer className="modal-foot">

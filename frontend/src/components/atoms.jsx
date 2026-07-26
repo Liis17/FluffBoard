@@ -20,6 +20,16 @@ export function PriorityPill({ priority, bare = false }) {
   )
 }
 
+/** Статус в режиме чтения. Цвет приходит из лейбла GitHub, второго источника правды у колонок нет. */
+export function StatusChip({ status }) {
+  return (
+    <span className="status-chip" style={{ color: `#${status.color}`, borderColor: `#${status.color}55` }}>
+      <span className="pill-dot" style={{ background: `#${status.color}` }} />
+      {status.name}
+    </span>
+  )
+}
+
 export function LabelChip({ label }) {
   return <span className="label-chip" style={getLabelColors(label.color)}>{label.name}</span>
 }
