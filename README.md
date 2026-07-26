@@ -42,4 +42,4 @@ docker login docker.barkfluff.com:5000
 docker compose up -d
 ```
 
-Если своего nginx на сервере нет — `docker compose --profile nginx up -d`; site-конфигурация лежит в `docker/nginx/fluffboard.conf`. Образ собирает GitHub Actions на self-hosted раннере при push в `main`. Подробности — в `Obsidian/FluffBoardVault/Развёртывание.md`.
+Наружу порт не смотрит: контейнер публикуется на `127.0.0.1:${FLUFFBOARD_PORT}`, а 443 держит отдельный nginx сервера. Ему нужно смонтировать `docker/nginx/fluffboard.conf` в `conf.d` — upstream идёт на `127.0.0.1:8080`, потому что этот nginx работает в `network_mode: host` и общей docker-сети с доской у него быть не может. Образ собирает GitHub Actions на self-hosted раннере при push в `main`. Подробности — в `Obsidian/FluffBoardVault/Развёртывание.md`.
